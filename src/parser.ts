@@ -38,25 +38,29 @@ export function parseFigBinary(data: Uint8Array): FigDocument {
 
   // Read length-prefixed chunks
   const chunks: Uint8Array[] = [];
+  let truncated: FigDocument["truncated"];
   let off = 12;
   while (off < data.byteLength) {
     // A truncated or mis-sliced buffer leaves fewer than 4 bytes for the next
     // length prefix, or declares a chunk running past the end. Report what was
     // actually seen — the raw DataView RangeError says nothing useful.
+    let problem: string | undefined;
+    const len = off + 4 > data.byteLength ? 0 : view.getUint32(off, true);
     if (off + 4 > data.byteLength) {
-      throw new Error(
-        `Truncated .fig binary: ${data.byteLength - off} byte(s) left at offset ${off}, ` +
-          `expected a 4-byte chunk length`,
-      );
+      problem = `${data.byteLength - off} byte(s) left at offset ${off}, expected a 4-byte chunk length`;
+    } else if (off + 4 + len > data.byteLength) {
+      problem =
+        `chunk ${chunks.length} declares ${len} bytes at offset ${off + 4} ` +
+        `but only ${data.byteLength - off - 4} remain`;
     }
-    const len = view.getUint32(off, true);
+    if (problem) {
+      // Schema and message are all the parser needs; a damaged passthrough
+      // chunk after them is dropped and reported rather than fatal.
+      if (chunks.length < 2) throw new Error(`Truncated .fig binary: ${problem}`);
+      truncated = { chunk: chunks.length, offset: off, message: problem };
+      break;
+    }
     off += 4;
-    if (off + len > data.byteLength) {
-      throw new Error(
-        `Truncated .fig binary: chunk ${chunks.length} declares ${len} bytes at offset ${off} ` +
-          `but only ${data.byteLength - off} remain`,
-      );
-    }
     chunks.push(data.subarray(off, off + len));
     off += len;
   }
@@ -110,6 +114,7 @@ export function parseFigBinary(data: Uint8Array): FigDocument {
     rawChunks: chunks,
     message,
     images: new Map(),
+    ...(truncated ? { truncated } : {}),
   };
 }
 

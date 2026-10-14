@@ -193,4 +193,10 @@ export interface FigDocument {
   meta?: Record<string, any>;
   thumbnail?: Uint8Array;
   images: Map<string, Uint8Array>;
+  /**
+   * Set when the binary ends inside a chunk after the schema and message.
+   * Those two decode normally; the damaged chunk and anything after it are
+   * left out of `rawChunks`, so re-encoding writes the file without them.
+   */
+  truncated?: { chunk: number; offset: number; message: string };
 }

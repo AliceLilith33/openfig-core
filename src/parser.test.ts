@@ -146,6 +146,29 @@ describe("parseFig input forms", () => {
     expect(() => parseFig(new Uint8Array([0x3c, 0x73, 0x76, 0x67]))).toThrow(/"PK".*"fig-".*3c 73 76 67/);
     expect(() => parseFig(new Uint8Array(0))).toThrow(/no bytes/);
   });
+
+  it("drops a damaged chunk after the message instead of failing, and still fails inside the message", () => {
+    const entries = unzipSync(new Uint8Array(readFileSync(join(fixturesDir, "circle.fig"))));
+    const canvas = entries[Object.keys(entries).find((k) => k.endsWith("canvas.fig"))!];
+    const whole = parseFig(canvas);
+    expect(whole.truncated).toBeUndefined();
+
+    // End of chunk 1: 12-byte header, then two length-prefixed chunks.
+    const view = new DataView(canvas.buffer, canvas.byteOffset, canvas.byteLength);
+    const len0 = view.getUint32(12, true);
+    const end1 = 16 + len0 + 4 + view.getUint32(16 + len0, true);
+
+    // A third chunk that declares 1000 bytes but carries 10.
+    const damaged = new Uint8Array(end1 + 14);
+    damaged.set(canvas.subarray(0, end1));
+    new DataView(damaged.buffer).setUint32(end1, 1000, true);
+    const doc = parseFig(damaged);
+    expect(doc.nodes.map(nodeId)).toEqual(whole.nodes.map(nodeId));
+    expect(doc.rawChunks).toHaveLength(2);
+    expect(doc.truncated).toMatchObject({ chunk: 2, offset: end1 });
+
+    expect(() => parseFig(canvas.subarray(0, end1 - 1))).toThrow(/Truncated \.fig binary: chunk 1/);
+  });
 });
 
 describe("liveChildren", () => {
