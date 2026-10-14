@@ -231,6 +231,34 @@ function layoutGrids(list: any[] | undefined): Rest.LayoutGrid[] | undefined {
   });
 }
 
+/**
+ * Figma stores NaN as the transform and size of a group whose children are all
+ * hidden, or a boolean operation with an empty result: there is nothing visible
+ * to bound. REST JSON cannot hold NaN, so such a node is placed at its parent's
+ * origin and sized to the box around its children, hidden or not.
+ */
+function finiteTransform(t: FigTransform | undefined): FigTransform | undefined {
+  if (!t) return undefined;
+  return [t.m00, t.m01, t.m02, t.m10, t.m11, t.m12].every(Number.isFinite) ? t : undefined;
+}
+
+function finiteSize(s: { x: number; y: number } | undefined): { x: number; y: number } | undefined {
+  return s && Number.isFinite(s.x) && Number.isFinite(s.y) ? { x: s.x, y: s.y } : undefined;
+}
+
+function childrenExtent(r: ResolvedNode): { x: number; y: number } {
+  let maxX = 0;
+  let maxY = 0;
+  for (const c of r.children) {
+    const t = finiteTransform(c.node.transform) ?? IDENTITY_TRANSFORM;
+    const s = finiteSize(c.node.size) ?? childrenExtent(c);
+    const box = boundingBox(t, s.x, s.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+  return { x: maxX, y: maxY };
+}
+
 function isSentinel(guid: any): boolean {
   return guid?.sessionID === SENTINEL && guid?.localID === SENTINEL;
 }
@@ -593,10 +621,10 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     return out;
   }
 
-  const rel: FigTransform = n.transform ?? IDENTITY_TRANSFORM;
+  const rel: FigTransform = finiteTransform(n.transform) ?? IDENTITY_TRANSFORM;
   const abs = multiplyTransform(scope.abs, rel);
   const hidden = scope.hidden || n.visible === false;
-  const size = { x: n.size?.x ?? 0, y: n.size?.y ?? 0 };
+  const size = finiteSize(n.size) ?? childrenExtent(r);
   const rot = Math.atan2(rel.m10, rel.m00);
   if (rot !== 0) out.rotation = rot;
 

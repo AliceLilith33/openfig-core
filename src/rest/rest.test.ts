@@ -159,6 +159,17 @@ describe("toRestDocument", () => {
     expect(rest.get("1:4")).not.toHaveProperty("cornerRadius");
   });
 
+  it("replaces the NaN geometry Figma stores for a group of hidden layers", () => {
+    const rest = index(toRestDocument(docOf([
+      { id: 1, parent: 100, type: "FRAME", resizeToFit: true, frameMaskDisabled: false, size: { x: NaN, y: NaN }, transform: { m00: 1, m01: 0, m02: 10, m10: 0, m11: 1, m12: 20 } },
+      { id: 2, parent: 1, type: "ROUNDED_RECTANGLE", visible: false, size: { x: 30, y: 40 }, transform: { m00: 1, m01: 0, m02: 5, m10: 0, m11: 1, m12: 5 } },
+      { id: 3, parent: 100, type: "BOOLEAN_OPERATION", size: { x: NaN, y: NaN }, transform: { m00: NaN, m01: NaN, m02: NaN, m10: NaN, m11: NaN, m12: NaN } },
+    ] as any)).document);
+    expect(rest.get("1:1")).toMatchObject({ size: { x: 35, y: 45 }, absoluteBoundingBox: { x: 10, y: 20, width: 35, height: 45 } });
+    expect(rest.get("1:3")).toMatchObject({ size: { x: 0, y: 0 }, relativeTransform: [[1, 0, 0], [0, 1, 0]] });
+    expect(JSON.stringify(rest.get("1:3"))).not.toContain("null,");
+  });
+
   it("converts a reference file, giving every resolved node one REST node", () => {
     const doc = parseFig(new Uint8Array(readFileSync(join(__dirname, "..", "..", "test-fixtures", "instances", "medium-complex.fig"))));
     const rest = index(toRestDocument(doc).document);

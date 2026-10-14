@@ -23,6 +23,11 @@ field of every node:
 at a folder holding `<name>.fig` next to `<name>/document.json`. It also runs
 without errors on 179 public files (815,280 REST nodes).
 
+Fed to [Framelink](https://github.com/GLips/Figma-Context-MCP)'s extractors, the
+output gives the same simplified node as the real REST response for 97.6% and
+95.8% of nodes in the two files (the rest differ mostly through the GROUP and
+VECTOR corner fields below), and Framelink reads every file of the corpus.
+
 ## Rules the files follow
 
 Most fields are renamed one to one. These are the ones that are not.
@@ -73,6 +78,11 @@ component.
 BOOLEAN_OPERATION, ELLIPSE, LINE, TEXT, SECTION). Corners that agree give
 `cornerRadius`; independent corners that differ give `rectangleCornerRadii`;
 `cornerSmoothing` comes with either.
+
+**NaN geometry.** Figma stores NaN as the size and transform of a group whose
+children are all hidden, and of a boolean operation with an empty result. JSON
+cannot hold NaN, so such a node is placed at its parent's origin and sized to
+the box around its children.
 
 **`backgroundColor`** (deprecated) is the topmost visible fill when that is a
 solid colour, else transparent.
