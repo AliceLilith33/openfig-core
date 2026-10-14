@@ -167,6 +167,17 @@ const variables = toRestVariables(doc);             // GET /v1/files/:key/variab
 
 The result is what Figma's REST API returns for the same file, typed with `@figma/rest-api-spec`, so tools written for the REST API can read a local `.fig`. Instances are expanded with REST's sublayer ids (`I<instance>;<key>`), shared styles and bound variables show their current values, and layout, text and interaction fields follow REST's names and defaults. Checked against REST responses for two community files, 99.78% of fields match; [docs/rest.md](docs/rest.md) lists the mapping rules and the known differences.
 
+## Design IR
+
+```ts
+import { designFromFig, toDesignIR } from 'openfig-core';
+
+const ir = designFromFig(doc);                       // from a parsed .fig
+const fromApi = toDesignIR(restJson, { variables }); // or from REST API responses
+```
+
+A description of the file for building its front end: screens with flex and grid layout, fill/hug sizing and constraints; design tokens with their values per mode and CSS variable names; shared styles; components with their properties, variants and hover/press states; instances as component + property values; prototype interactions; text runs; gradients as CSS; and an asset list of images, fonts and SVG artwork for icons. Built from the REST view, it comes out the same from Figma's own REST JSON as from the `.fig` for 99.9% of nodes; see [docs/ir.md](docs/ir.md).
+
 ## Encoding (write .fig files)
 
 ### Round-trip: open, edit, save
@@ -249,6 +260,7 @@ Detailed documentation of the Figma binary format is in [`docs/`](docs/):
 | [Slides](docs/slides.md) | Slide dimensions, cloning, ordering |
 | [Modes](docs/modes.md) | Slides mode vs Design mode |
 | [REST view](docs/rest.md) | `toRestDocument`: kiwi → REST mapping rules, accuracy, known differences |
+| [Design IR](docs/ir.md) | `toDesignIR`: the front-end description of a file, its conventions and checks |
 | [Invariants](docs/invariants.md) | Hard rules and sentinel values |
 | [Research](docs/research.md) | Binary format analysis and references |
 
