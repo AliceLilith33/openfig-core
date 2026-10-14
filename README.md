@@ -127,6 +127,18 @@ Each `ResolvedNode` has `node` (a copy with everything applied), `source` (the n
 
 `resolveTree(doc, node)` does the same for any node, expanding every instance beneath it. Nothing in `doc` is modified.
 
+## Resolving variables
+
+```ts
+import { resolvePaintColor, resolveBoundVariables, resolveVariable } from 'openfig-core';
+
+resolvePaintColor(doc, node.fillPaints[0], { node });       // FigColor, following a colorVar binding
+resolveBoundVariables(doc, node).get('CORNER_RADIUS');      // { type: 'FLOAT', value: 8, variable, modeID }
+resolveVariable(doc, { guid }, { modes: new Map([[setId, darkModeId]]) });
+```
+
+Aliases are followed, local (`guid`) and library (`assetRef.key`) references both resolve, and the mode for each set comes from the nearest `variableModeBySetMap` on the node or its ancestors, else the set's first mode (`variableModes(set)`). A value that cannot be resolved — a variable not in the file, or an alias loop — is `undefined`; `resolvePaintColor` then falls back to the paint's own `color`.
+
 ## Encoding (write .fig files)
 
 ### Round-trip: open, edit, save

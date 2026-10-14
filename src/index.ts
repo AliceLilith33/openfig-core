@@ -16,6 +16,16 @@ export {
   getAbsoluteBoundingBox,
 } from "./tree.js";
 export { resolveTree, resolveInstance, walkResolved, overrideKeyOf } from "./instance.js";
+export {
+  findVariable,
+  variableSetOf,
+  variableModes,
+  explicitModes,
+  resolveVariable,
+  resolveVariableData,
+  resolvePaintColor,
+  resolveBoundVariables,
+} from "./variables.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export {
   appendVectorPayloadToDocument,
@@ -36,6 +46,7 @@ export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from 
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
 export type { ResolvedNode, ResolveOptions } from "./instance.js";
+export type { FigVariableRef, ResolveVariableOptions, ResolvedVariableValue } from "./variables.js";
 export type {
   GradientFillLike,
   GradientKind,

@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
 - `liveChildren(doc, id)` — a node's children in layer order, without `REMOVED` nodes.
 - `resolveInstance(doc, instance)` and `resolveTree(doc, node)` — what an instance displays: its symbol's content with overrides, `derivedSymbolData` and component property values applied, nested instances expanded and instance swaps followed. Every override and derived entry in the reference corpus (21,608 across 440 instances) lands on exactly one node, and every derived size and transform matches. With `walkResolved` and `overrideKeyOf`.
+- Variable resolution: `resolveVariable`, `resolveVariableData`, `resolvePaintColor` and `resolveBoundVariables`, with `findVariable`, `variableSetOf`, `variableModes` and `explicitModes`. Aliases are followed, library variables resolve by asset key, and modes come from `variableModeBySetMap`. All 107 variable-bound paints in the reference corpus resolve to the colour Figma cached on the paint.
 - Tree helpers: `walk`, `findAll`, `parentOf`, `ancestors`, `pageOf`. They tolerate dangling parents and parent cycles.
 - `getAbsoluteTransform` and `getAbsoluteBoundingBox` — page coordinates, composed up to the node's `CANVAS`; with `multiplyTransform`, `applyTransform` and `IDENTITY_TRANSFORM`.
 
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known limitations
 
 - Component property assignments (`componentPropAssignments` → `componentPropRefs`) are applied per the schema, but no reference file uses them, so that path is tested only against hand-built documents.
+- Every variable set in the reference files has one mode and no variable aliases another, so mode selection and alias chains are likewise tested only against hand-built documents. Extended sets (`variableSetExtensionID`, `parentModeId`) are not handled.
 
 ## [0.4.1] - 2026-08-01
 
