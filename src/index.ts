@@ -52,7 +52,7 @@ export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from 
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
 export type { ResolvedNode, ResolveOptions } from "./instance.js";
-export type { RestFile, ToRestOptions } from "./rest/index.js";
+export type { RestFile, TextLine, ToRestOptions } from "./rest/index.js";
 export type { RestVariables } from "./rest/variables.js";
 export type * from "./ir/types.js";
 export type { ToDesignIROptions } from "./ir/index.js";

@@ -264,6 +264,15 @@ export interface IRText {
   maxLines?: number;
   /** The whole text links here: a URL, or `#<node id>`. */
   link?: string;
+  /**
+   * The lines Figma laid the text out in when the file was saved, measured
+   * with Figma's own builds of the fonts: where each starts in `content`, in
+   * code points, and its width in pixels, trailing spaces included. Shows
+   * where Figma wrapped and how wide each line was; a browser with another
+   * build of a font measures a few percent differently. Absent when the file
+   * holds no layout for the text.
+   */
+  measuredLines?: Array<{ start: number; width: number }>;
 }
 
 export interface IRTextStyle {

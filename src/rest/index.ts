@@ -23,6 +23,22 @@ import { collectionIdOfRef, restCollectionId } from "./variables.js";
 export interface ToRestOptions {
   /** Include `fillGeometry` and `strokeGeometry`, as `?geometry=paths` does. Default false, as in REST. */
   geometry?: boolean;
+  /**
+   * Filled, when given, with the lines Figma laid out each text in, by node
+   * id: what `derivedTextData` saved. REST has no field for them.
+   */
+  textLines?: Map<string, TextLine[]>;
+}
+
+/**
+ * One line of a text as Figma laid it out, from `derivedTextData` (or, in
+ * older files, `textData`): where it starts in the text's
+ * characters, counted in code points, and its advance width in pixels,
+ * trailing spaces included.
+ */
+export interface TextLine {
+  start: number;
+  width: number;
 }
 
 export type RestFile = Pick<
@@ -40,6 +56,7 @@ interface Ctx {
   usedStyles: Set<string>;
   /** Each converted node's painted area, clipped, even where REST reports null (masks, operands). */
   painted: WeakMap<object, Rect | null>;
+  textLines?: Map<string, TextLine[]>;
 }
 
 /** What a node inherits from the nodes above it in the expanded tree. */
@@ -681,6 +698,20 @@ function fillOverrideTable(ctx: Ctx, n: any, resolve: ColorResolver): Record<str
   return out;
 }
 
+/**
+ * The lines Figma saved for a text node, when they cover its characters as
+ * they are now; an override that changed the text without a new layout leaves
+ * none.
+ */
+function textLines(n: any): TextLine[] | undefined {
+  // Older files keep the layout in `textData` itself.
+  const lines: any[] | undefined = n.derivedTextData?.baselines ?? n.textData?.baselines;
+  if (!lines?.length) return undefined;
+  const count = Array.from(n.textData?.characters ?? "").length;
+  if (lines[lines.length - 1].endCharacter !== count) return undefined;
+  return lines.map((b) => ({ start: b.firstCharacter ?? 0, width: Math.round((b.width ?? 0) * 100) / 100 }));
+}
+
 function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
   const n: any = r.node;
   const id = r.path.length && scope.instanceRoot
@@ -824,6 +855,8 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
       delete out.styles.text;
       if (!Object.keys(out.styles).length) delete out.styles;
     }
+    const lines = ctx.textLines && textLines(n);
+    if (lines) ctx.textLines!.set(id, lines);
   }
   if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
   if (type === "ELLIPSE") {
@@ -928,7 +961,7 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap() };
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines };
   const document = convert(ctx, resolveTree(doc, root), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,

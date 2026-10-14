@@ -181,6 +181,74 @@ describe("toDesignIR", () => {
     expect(f.modes).toEqual({ Theme: "Dark" });
   });
 
+  it("names deleted variables after local and library ones", () => {
+    const variable = (id: string, collection: string, extra: object = {}) => ({
+      id, name: "bg", key: "", variableCollectionId: collection, resolvedType: "FLOAT", valuesByMode: {}, remote: false,
+      description: "", hiddenFromPublishing: false, scopes: ["ALL_SCOPES"], codeSyntax: {}, ...extra,
+    });
+    const meta = {
+      variableCollections: {
+        "VariableCollectionId:1:1": { id: "VariableCollectionId:1:1", name: "Theme", key: "", modes: [{ modeId: "1:0", name: "Mode 1" }], defaultModeId: "1:0", remote: false, hiddenFromPublishing: false, variableIds: [] },
+        "VariableCollectionId:abc/1:2": { id: "VariableCollectionId:abc/1:2", name: "Lib", key: "abc", modes: [{ modeId: "2:0", name: "Mode 1" }], defaultModeId: "2:0", remote: true, hiddenFromPublishing: false, variableIds: [] },
+      },
+      // Listed deleted first; its collection is left out of the response.
+      variables: {
+        "VariableID:9:3": variable("VariableID:9:3", "VariableCollectionId:1:9", { deletedButReferenced: true }),
+        "VariableID:k2/5:5": variable("VariableID:k2/5:5", "VariableCollectionId:abc/1:2", { key: "k2", remote: true }),
+        "VariableID:9:1": variable("VariableID:9:1", "VariableCollectionId:1:1"),
+      },
+    } as unknown as RestVariables["meta"];
+    const ir = toDesignIR(file([]), { variables: meta });
+    expect(Object.keys(ir.tokens.tokens).sort()).toEqual(["?/bg", "Lib/bg", "bg"]);
+    expect(ir.tokens.tokens.bg).toMatchObject({ collection: "Theme" });
+    expect(ir.tokens.tokens["Lib/bg"]).toMatchObject({ collection: "Lib" });
+  });
+
+  it("applies modes set on a page or a section to the screens inside it", () => {
+    const meta = {
+      variableCollections: {
+        "VariableCollectionId:1:1": { id: "VariableCollectionId:1:1", name: "Theme", key: "", modes: [{ modeId: "1:0", name: "Light" }, { modeId: "1:1", name: "Dark" }], defaultModeId: "1:0", remote: false, hiddenFromPublishing: false, variableIds: [] },
+        "VariableCollectionId:1:2": { id: "VariableCollectionId:1:2", name: "Density", key: "", modes: [{ modeId: "2:0", name: "Compact" }, { modeId: "2:1", name: "Comfy" }], defaultModeId: "2:0", remote: false, hiddenFromPublishing: false, variableIds: [] },
+      },
+      variables: {},
+    } as unknown as RestVariables["meta"];
+    const f = file([
+      node("1:1", "SECTION", {
+        explicitVariableModes: { "VariableCollectionId:1:2": "2:1" },
+        children: [
+          node("1:2", "FRAME"),
+          // The screen's own mode wins.
+          node("1:3", "FRAME", { explicitVariableModes: { "VariableCollectionId:1:1": "1:0" } }),
+        ],
+      }),
+      node("1:4", "FRAME"),
+    ]);
+    (f.document.children[0] as any).explicitVariableModes = { "VariableCollectionId:1:1": "1:1", "VariableCollectionId:1:2": "2:0" };
+    const n = index(toDesignIR(f, { variables: meta }));
+    expect(n.get("1:2")!.modes).toEqual({ Theme: "Dark", Density: "Comfy" });
+    expect(n.get("1:3")!.modes).toEqual({ Theme: "Light", Density: "Comfy" });
+    expect(n.get("1:4")!.modes).toEqual({ Theme: "Dark", Density: "Compact" });
+  });
+
+  it("carries vertical trim into the text style", () => {
+    const style = (leadingTrim: string) => ({ fontFamily: "Inter", fontStyle: "Regular", fontWeight: 400, fontSize: 12, lineHeightPx: 14, leadingTrim });
+    const n = index(toDesignIR(file([
+      node("1:1", "TEXT", { characters: "x", style: style("CAP_HEIGHT") }),
+      node("1:2", "TEXT", { characters: "x", style: style("NONE") }),
+    ])));
+    expect(n.get("1:1")!.text!.style).toMatchObject({ leadingTrim: "cap" });
+    expect(n.get("1:2")!.text!.style).not.toHaveProperty("leadingTrim");
+  });
+
+  it("gives Figma's lines of a text from the file", () => {
+    const doc = parseFig(new Uint8Array(readFileSync(join(__dirname, "..", "..", "test-fixtures", "instances", "medium-complex.fig"))));
+    const textLines = new Map();
+    const n = index(toDesignIR(toRestDocument(doc, { textLines }), { textLines }));
+    expect(n.get("1:93")!.text!.measuredLines).toEqual([{ start: 0, width: 208.43 }, { start: 20, width: 268.88 }]);
+    // Without the file's layout (from the REST API) there are none.
+    expect(index(toDesignIR(toRestDocument(doc))).get("1:93")!.text).not.toHaveProperty("measuredLines");
+  });
+
   it("describes components, variants, their states and instances", () => {
     const hover = (to: string, trigger = "ON_HOVER") => [{ trigger: { type: trigger }, actions: [{ type: "NODE", destinationId: to, navigation: "CHANGE_TO", transition: { type: "SMART_ANIMATE", duration: 200, easing: { type: "EASE_OUT" } } }] }];
     const ir = toDesignIR(file([

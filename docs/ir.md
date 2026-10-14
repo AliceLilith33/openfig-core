@@ -59,7 +59,7 @@ DesignIR
 | Components | `components[id]`: `props` (variant, boolean, text, instance swap; with defaults and options), `variants` with their property values, and `states`. |
 | Instances | `type: "instance"` with `component: { id, set, variant, props, overrides, scale }`. Their layers stay expanded unless `instances: "reference"` is passed. |
 | Prototype | `interactions`: trigger (`click`, `hover`, `press`, `mouse-enter`, `after-delay`, `key`, ...) and actions (`navigate`, `overlay`, `swap-overlay`, `scroll-to`, `change-to`, `back`, `close`, `open-url`) with target, transition and CSS easing. |
-| Text | `text: { content, style, runs, lines, autoResize, maxLines, link }`. Runs list only what differs from the base style; Figma indexes their styles by code point, so an emoji counts once. |
+| Text | `text: { content, style, runs, lines, autoResize, maxLines, link, measuredLines }`. Runs list only what differs from the base style; Figma indexes their styles by code point, so an emoji counts once. `measuredLines` is how Figma laid the text out when the file was saved: each line's start in `content` (in code points) and its width, trailing spaces included. It shows where Figma wrapped, and how much wider or narrower a browser's build of the font sets the same line. It comes from the `.fig` file (`designFromFig`, or `toRestDocument`'s `textLines` passed on as `textLines`); REST has no such field. |
 | Gradients | `{ type, stops, css, handles }`: `css` is the gradient for the node's box. |
 | Images | `{ type: "image", image, fit: "cover" \| "contain" \| "crop" \| "tile", crop }`. A rectangle or empty frame filled by one image is `type: "image"`. |
 

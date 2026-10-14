@@ -4,7 +4,7 @@
  */
 import type * as Rest from "@figma/rest-api-spec";
 import type { FigDocument } from "../types.js";
-import { toRestDocument, type RestFile } from "../rest/index.js";
+import { toRestDocument, type RestFile, type TextLine } from "../rest/index.js";
 import { toRestVariables, type RestVariables } from "../rest/variables.js";
 import { blendMode, hex, irEffects, irPaints, irStroke, round, type TokenOf } from "./paint.js";
 import { hasGeometry, nodeSvg } from "./svg.js";
@@ -33,6 +33,8 @@ export interface ToDesignIROptions {
   keepHidden?: boolean;
   /** Vector-only frames and groups up to this size become SVG artwork. Default 160. */
   iconMaxSize?: number;
+  /** Figma's layout of each text, by node id, from `toRestDocument`'s `textLines`. */
+  textLines?: Map<string, TextLine[]>;
 }
 
 const VECTOR_TYPES = new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "REGULAR_POLYGON"]);
@@ -315,6 +317,8 @@ function irText(ctx: Ctx, n: any): IRText {
   if (base.maxLines) out.maxLines = base.maxLines;
   const l = link(base.hyperlink);
   if (l) out.link = l;
+  const measured = ctx.options.textLines?.get(n.id);
+  if (measured) out.measuredLines = measured;
   return out;
 }
 
@@ -843,9 +847,11 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
 }
 
 /** The design IR of a parsed .fig file: `toDesignIR` over its REST view, with geometry, variables and images. */
-export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images"> = {}): DesignIR {
-  return toDesignIR(toRestDocument(doc, { geometry: true }), {
+export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines"> = {}): DesignIR {
+  const textLines = new Map<string, TextLine[]>();
+  return toDesignIR(toRestDocument(doc, { geometry: true, textLines }), {
     ...options,
+    textLines,
     variables: toRestVariables(doc),
     images: doc.images,
   });
