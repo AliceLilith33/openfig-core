@@ -84,6 +84,18 @@ describe("resolveInstance", () => {
     expect(r.node.size).toEqual({ x: 300, y: 200 });
   });
 
+  it("keeps the scaled lengths a scaled instance stores over an entry for its root", () => {
+    const doc = docOf([...base(), {
+      id: 1, type: "INSTANCE", strokeWeight: 2, cornerRadius: 16, stackSpacing: 8,
+      symbolData: { symbolID: G(10), uniformScaleFactor: 2, symbolOverrides: [
+        // Entries from before the scaling, beside fields the instance does not store.
+        override([K(10)], { strokeWeight: 1, cornerRadius: 8, stackSpacing: 4, stackHorizontalPadding: 6, name: "Big card" }),
+      ] },
+    }]);
+    const r = resolveInstance(doc, doc.nodeMap.get("1:1")!);
+    expect(r.node).toMatchObject({ strokeWeight: 2, cornerRadius: 16, stackSpacing: 8, stackHorizontalPadding: 6, name: "Big card" });
+  });
+
   it("follows two-segment paths into the swapped-in symbol", () => {
     const doc = docOf([...base(), {
       id: 1, type: "INSTANCE", symbolData: { symbolID: G(10), symbolOverrides: [

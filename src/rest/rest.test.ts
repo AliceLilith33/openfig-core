@@ -243,6 +243,97 @@ describe("toRestDocument", () => {
     expect(meta.variables["VariableID:k61/3:4"]).toMatchObject({ remote: true, deletedButReferenced: true, valuesByMode: { "1:51": 8 }, scopes: ["ALL_SCOPES"] });
   });
 
+  it("leaves out a deleted collection and marks its variables deleted", () => {
+    const { meta } = toRestVariables(docOf([
+      { id: 50, parent: 100, type: "VARIABLE_SET", name: "Old", isSoftDeleted: true, variableSetModes: [{ id: G(51), name: "Mode 1", sortPosition: "a" }] },
+      { id: 60, parent: 100, type: "VARIABLE", name: "gap", variableSetID: { guid: G(50) }, variableResolvedType: "FLOAT", variableDataValues: { entries: [{ modeID: G(51), variableData: { dataType: "FLOAT", value: { floatValue: 4 } } }] } },
+      { id: 70, parent: 100, type: "VARIABLE_SET", name: "Live", variableSetModes: [{ id: G(71), name: "Mode 1", sortPosition: "a" }] },
+      { id: 80, parent: 100, type: "VARIABLE", name: "pad", variableSetID: { guid: G(70) }, variableResolvedType: "FLOAT", variableDataValues: { entries: [{ modeID: G(71), variableData: { dataType: "FLOAT", value: { floatValue: 8 } } }] } },
+    ] as any));
+    expect(Object.keys(meta.variableCollections)).toEqual(["VariableCollectionId:1:70"]);
+    expect(meta.variables["VariableID:1:60"]).toMatchObject({ variableCollectionId: "VariableCollectionId:1:50", deletedButReferenced: true });
+    expect(meta.variables["VariableID:1:80"]).not.toHaveProperty("deletedButReferenced");
+  });
+
+  it("shows a text style's variable bindings on the text that uses it", () => {
+    const alias = (localID: number) => ({ dataType: "ALIAS", value: { alias: { guid: G(localID) } } });
+    const fontStyle = (value: object) => ({ dataType: "FONT_STYLE", value: { fontStyleValue: value } });
+    const textStyle = (id: number, entries: any[]) => ({
+      id, parent: 100, type: "TEXT", styleType: "TEXT", name: `Style ${id}`, fontSize: 16, fontName: { family: "Inter", style: "Regular", postscript: "" },
+      variableConsumptionMap: { entries },
+    });
+    const text = (id: number, style: number, extra: object = {}) => ({
+      id, parent: 100, type: "TEXT", textData: { characters: "x" }, fontSize: 16, fontName: { family: "Inter", style: "Regular", postscript: "" },
+      styleIdForText: { guid: G(style) }, ...extra,
+    });
+    const rest = index(toRestDocument(docOf([
+      textStyle(50, [
+        { variableField: "FONT_SIZE", variableData: alias(60) },
+        { variableField: "FONT_FAMILY", variableData: alias(61) },
+        // A numeric font style variable is the weight.
+        { variableField: "FONT_STYLE", variableData: fontStyle({ asFloat: alias(62) }) },
+      ]),
+      textStyle(51, [{ variableField: "FONT_STYLE", variableData: fontStyle({ asString: alias(63) }) }]),
+      text(1, 50),
+      text(2, 51),
+      // The node's own binding wins over its style's.
+      text(3, 50, { variableConsumptionMap: { entries: [{ variableField: "FONT_SIZE", variableData: alias(64) }] } }),
+      text(4, 51, { variableConsumptionMap: { entries: [{ variableField: "FONT_STYLE", variableData: fontStyle({ asFloat: alias(65) }) }] } }),
+    ] as any)).document);
+    const v = (localID: number) => ({ type: "VARIABLE_ALIAS", id: `VariableID:1:${localID}` });
+    expect(rest.get("1:1").boundVariables).toEqual({ fontSize: [v(60)], fontFamily: [v(61)], fontWeight: [v(62)] });
+    expect(rest.get("1:2").boundVariables).toEqual({ fontStyle: [v(63)] });
+    expect(rest.get("1:3").boundVariables).toEqual({ fontSize: [v(64)], fontFamily: [v(61)], fontWeight: [v(62)] });
+    // The node's own font style binding, in its type style too.
+    expect(rest.get("1:4").boundVariables).toEqual({ fontWeight: [v(65)], fontStyle: [v(63)] });
+    expect(rest.get("1:4").style.boundVariables).toEqual({ fontWeight: v(65) });
+  });
+
+  it("sets the original case and no decoration when a text style leaves them out", () => {
+    const font = { fontSize: 16, fontName: { family: "Inter", style: "Regular", postscript: "" } };
+    const rest = index(toRestDocument(docOf([
+      { id: 50, parent: 100, type: "TEXT", styleType: "TEXT", name: "Plain", ...font },
+      { id: 51, parent: 100, type: "TEXT", styleType: "TEXT", name: "Caps", textCase: "UPPER", textDecoration: "UNDERLINE", ...font },
+      // The node's cached copy still says upper case and underline.
+      { id: 1, parent: 100, type: "TEXT", textData: { characters: "x" }, textCase: "UPPER", textDecoration: "UNDERLINE", styleIdForText: { guid: G(50) }, ...font },
+      { id: 2, parent: 100, type: "TEXT", textData: { characters: "x" }, styleIdForText: { guid: G(51) }, ...font },
+      { id: 3, parent: 100, type: "TEXT", textData: { characters: "x" }, textCase: "UPPER", ...font },
+    ] as any)).document);
+    expect(rest.get("1:1").style).not.toHaveProperty("textCase");
+    expect(rest.get("1:1").style).not.toHaveProperty("textDecoration");
+    expect(rest.get("1:2").style).toMatchObject({ textCase: "UPPER", textDecoration: "UNDERLINE" });
+    // Without a style the node's own value stands.
+    expect(rest.get("1:3").style).toMatchObject({ textCase: "UPPER" });
+  });
+
+  it("keeps explicit variable modes on a section", () => {
+    const rest = index(toRestDocument(docOf([
+      { id: 50, parent: 100, type: "VARIABLE_SET", name: "Theme", variableSetModes: [{ id: G(51), name: "Light", sortPosition: "a" }, { id: G(52), name: "Dark", sortPosition: "b" }] },
+      { id: 1, parent: 100, type: "SECTION", variableModeBySetMap: { entries: [{ variableSetID: { guid: G(50) }, variableModeID: G(52) }] } },
+    ] as any)).document);
+    expect(rest.get("1:1")).toMatchObject({ type: "SECTION", explicitVariableModes: { "VariableCollectionId:1:50": "1:52" } });
+  });
+
+  it("outlines strokes only when one shows", () => {
+    // A blob for the path M 0 0 L 10 0 Z.
+    const blob = new Uint8Array(1 + 8 + 1 + 8 + 1);
+    const view = new DataView(blob.buffer);
+    blob[0] = 1;
+    blob[9] = 2;
+    view.setFloat32(10, 10, true);
+    const red = { type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } };
+    const doc = docOf([
+      { id: 1, parent: 100, type: "ROUNDED_RECTANGLE", strokePaints: [red], strokeGeometry: [{ commandsBlob: 0 }] },
+      { id: 2, parent: 100, type: "ROUNDED_RECTANGLE", strokePaints: [{ ...red, visible: false }], strokeGeometry: [{ commandsBlob: 0 }] },
+      { id: 3, parent: 100, type: "ROUNDED_RECTANGLE", strokeGeometry: [{ commandsBlob: 0 }] },
+    ] as any);
+    (doc as any).message.blobs.push(blob);
+    const rest = index(toRestDocument(doc, { geometry: true }).document);
+    expect(rest.get("1:1").strokeGeometry).toHaveLength(1);
+    expect(rest.get("1:2").strokeGeometry).toEqual([]);
+    expect(rest.get("1:3").strokeGeometry).toEqual([]);
+  });
+
   it("converts a reference file, giving every resolved node one REST node", () => {
     const doc = parseFig(new Uint8Array(readFileSync(join(__dirname, "..", "..", "test-fixtures", "instances", "medium-complex.fig"))));
     const rest = index(toRestDocument(doc).document);

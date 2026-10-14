@@ -221,10 +221,12 @@ export function resolveTree(doc: FigDocument, node: FigNode, options: ResolveOpt
     // the outer scope's own entries for it.
     const selfKey = symbol ? overrideKeyOf(symbol) : undefined;
     if (selfKey) {
+      const scale = source.symbolData?.uniformScaleFactor;
+      const scaled = scale !== undefined && scale !== 1;
       for (const o of addressed(inner.overrides, selfKey)) {
         // Scaling an instance scales the lengths it stores; an entry for the
         // root may still hold them from before.
-        const fresh = Object.fromEntries(Object.entries(o.data).filter(([k]) => !(SCALED_FIELDS.has(k) && k in source)));
+        const fresh = Object.fromEntries(Object.entries(o.data).filter(([k]) => !(scaled && SCALED_FIELDS.has(k) && k in source)));
         applyNodeChange(node, fresh);
       }
     }
