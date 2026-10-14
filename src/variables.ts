@@ -53,6 +53,30 @@ function guidKey(guid: FigGuid | undefined | null): string {
   return guid ? `${guid.sessionID}:${guid.localID}` : "";
 }
 
+/** Live VARIABLE and VARIABLE_SET nodes by `type:key`, built once per document. */
+const keyIndexes = new WeakMap<FigDocument, Map<string, FigNode>>();
+
+function byKey(doc: FigDocument, type: string, key: string): FigNode | undefined {
+  let index = keyIndexes.get(doc);
+  if (!index) {
+    index = new Map();
+    for (const n of doc.nodes) {
+      if ((n.type === "VARIABLE" || n.type === "VARIABLE_SET") && n.key && n.phase !== "REMOVED") {
+        const k = `${n.type}:${n.key}`;
+        if (!index.has(k)) index.set(k, n);
+      }
+    }
+    keyIndexes.set(doc, index);
+  }
+  // The index is a cache: confirm a hit, and fall back to a scan on a miss, so
+  // a document edited after the first lookup still resolves correctly.
+  const hit = index.get(`${type}:${key}`);
+  if (hit && hit.type === type && hit.key === key && hit.phase !== "REMOVED") return hit;
+  const found = doc.nodes.find((n) => n.type === type && n.key === key && n.phase !== "REMOVED");
+  if (found) index.set(`${type}:${key}`, found);
+  return found;
+}
+
 function byRef(doc: FigDocument, ref: FigVariableRef | undefined, type: string): FigNode | undefined {
   if (!ref) return undefined;
   if (ref.guid) {
@@ -60,8 +84,13 @@ function byRef(doc: FigDocument, ref: FigVariableRef | undefined, type: string):
     if (node?.type === type) return node;
   }
   const key = ref.assetRef?.key;
-  if (key) return doc.nodes.find((n) => n.type === type && n.key === key && n.phase !== "REMOVED");
+  if (key) return byKey(doc, type, key);
   return undefined;
+}
+
+/** The VARIABLE_SET a reference names, if it is in the file. */
+export function findVariableSet(doc: FigDocument, ref: FigVariableRef | undefined): FigNode | undefined {
+  return byRef(doc, ref, "VARIABLE_SET");
 }
 
 /** The VARIABLE a reference names, if it is in the file. */

@@ -1,0 +1,810 @@
+/**
+ * The REST API view of a parsed file: the JSON `GET /v1/files/:key` returns,
+ * built from the .fig data alone.
+ *
+ * Node ids, types and fields follow `@figma/rest-api-spec`. Instances are
+ * expanded the way REST expands them — their sublayers appear with ids of the
+ * form `I<instance id>;<override key>;...` — and values come from Figma's
+ * cached layout (`derivedSymbolData`) where it has one.
+ */
+import type * as Rest from "@figma/rest-api-spec";
+import type { FigColor, FigDocument, FigGuid, FigNode, FigTransform } from "../types.js";
+import { resolveTree, type ResolvedNode } from "../instance.js";
+import { multiplyTransform, IDENTITY_TRANSFORM } from "../tree.js";
+import { comparePosition, nodeId } from "../utils.js";
+import { findVariableSet, resolveVariableData } from "../variables.js";
+import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
+import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
+import { interactions } from "./interactions.js";
+import { textFields } from "./text.js";
+
+export interface ToRestOptions {
+  /** Include `fillGeometry` and `strokeGeometry`, as `?geometry=paths` does. Default false, as in REST. */
+  geometry?: boolean;
+}
+
+export type RestFile = Pick<
+  Rest.GetFileResponse,
+  "document" | "components" | "componentSets" | "styles" | "schemaVersion" | "name"
+>;
+
+interface Ctx {
+  doc: FigDocument;
+  geometry: boolean;
+  /** Style and component nodes by their library key. */
+  byKey: Map<string, FigNode>;
+  /** Component and style ids the converted tree shows or refers to. */
+  usedComponents: Set<string>;
+  usedStyles: Set<string>;
+}
+
+/** What a node inherits from the nodes above it in the expanded tree. */
+interface Scope {
+  parent?: FigNode;
+  abs: FigTransform;
+  hidden: boolean;
+  /** Variable mode per set node id. */
+  modes: Map<string, FigGuid>;
+  /** The outermost instance whose sublayers these are. */
+  instanceRoot?: string;
+  /** The component (or set) whose property definitions `componentPropRefs` point into. */
+  propOwner?: FigNode;
+  /** Overrides from enclosing instances, by path from `instanceRoot`. */
+  outer: OuterOverride[];
+  /** Product of the uniformScaleFactor of enclosing instances. */
+  scale: number;
+}
+
+interface OuterOverride {
+  path: string[];
+  fields: string[];
+}
+
+const SENTINEL = 0xffffffff;
+
+const CONSTRAINT_H: Record<string, Rest.LayoutConstraint["horizontal"]> = {
+  MIN: "LEFT", MAX: "RIGHT", CENTER: "CENTER", STRETCH: "LEFT_RIGHT", SCALE: "SCALE",
+};
+const CONSTRAINT_V: Record<string, Rest.LayoutConstraint["vertical"]> = {
+  MIN: "TOP", MAX: "BOTTOM", CENTER: "CENTER", STRETCH: "TOP_BOTTOM", SCALE: "SCALE",
+};
+
+const VARIABLE_FIELDS: Record<string, [string, string?]> = {
+  WIDTH: ["size", "x"],
+  HEIGHT: ["size", "y"],
+  STACK_SPACING: ["itemSpacing"],
+  STACK_COUNTER_SPACING: ["counterAxisSpacing"],
+  STACK_PADDING_LEFT: ["paddingLeft"],
+  STACK_PADDING_TOP: ["paddingTop"],
+  STACK_PADDING_RIGHT: ["paddingRight"],
+  STACK_PADDING_BOTTOM: ["paddingBottom"],
+  VISIBLE: ["visible"],
+  OPACITY: ["opacity"],
+  RECTANGLE_TOP_LEFT_CORNER_RADIUS: ["topLeftRadius"],
+  RECTANGLE_TOP_RIGHT_CORNER_RADIUS: ["topRightRadius"],
+  RECTANGLE_BOTTOM_LEFT_CORNER_RADIUS: ["bottomLeftRadius"],
+  RECTANGLE_BOTTOM_RIGHT_CORNER_RADIUS: ["bottomRightRadius"],
+  MIN_WIDTH: ["minWidth"],
+  MAX_WIDTH: ["maxWidth"],
+  MIN_HEIGHT: ["minHeight"],
+  MAX_HEIGHT: ["maxHeight"],
+  BORDER_TOP_WEIGHT: ["individualStrokeWeights", "top"],
+  BORDER_BOTTOM_WEIGHT: ["individualStrokeWeights", "bottom"],
+  BORDER_LEFT_WEIGHT: ["individualStrokeWeights", "left"],
+  BORDER_RIGHT_WEIGHT: ["individualStrokeWeights", "right"],
+  TEXT_DATA: ["characters"],
+};
+
+const TEXT_VARIABLE_FIELDS: Record<string, string> = {
+  FONT_FAMILY: "fontFamily", FONT_SIZE: "fontSize", FONT_STYLE: "fontStyle", FONT_WEIGHT: "fontWeight",
+  LETTER_SPACING: "letterSpacing", LINE_HEIGHT: "lineHeight", PARAGRAPH_SPACING: "paragraphSpacing",
+  PARAGRAPH_INDENT: "paragraphIndent",
+};
+
+/** The REST fields an instance override of each kiwi field shows up as. */
+const OVERRIDE_FIELDS: Record<string, string[]> = {
+  name: ["name"],
+  visible: ["visible"],
+  locked: ["locked"],
+  opacity: ["opacity"],
+  size: ["height", "width"],
+  proportionsConstrained: ["preserveRatio"],
+  fillPaints: ["fills"],
+  strokePaints: ["strokes"],
+  styleIdForFill: ["inheritFillStyleId"],
+  styleIdForStrokeFill: ["strokes"],
+  styleIdForText: ["inheritTextStyleId", "openTypeFlags", "text"],
+  styleIdForEffect: ["effects"],
+  effects: ["effects"],
+  strokeWeight: ["strokeWeight"],
+  strokeAlign: ["strokeAlign"],
+  dashPattern: ["strokeDashes"],
+  borderTopWeight: ["individualStrokeWeights", "strokeWeight"],
+  borderBottomWeight: ["individualStrokeWeights", "strokeWeight"],
+  borderLeftWeight: ["individualStrokeWeights", "strokeWeight"],
+  borderRightWeight: ["individualStrokeWeights", "strokeWeight"],
+  cornerRadius: ["cornerRadius"],
+  rectangleTopLeftCornerRadius: ["topLeftRadius"],
+  rectangleTopRightCornerRadius: ["topRightRadius"],
+  rectangleBottomLeftCornerRadius: ["bottomLeftRadius"],
+  rectangleBottomRightCornerRadius: ["bottomRightRadius"],
+  textData: ["characterStyleOverrides", "characters", "lineIndentations", "lineTypes", "styleOverrideTable"],
+  fontName: ["fontFamily", "fontPostScriptName", "fontWeight", "italic"],
+  fontSize: ["fontSize", "letterSpacing", "lineHeightPercent", "lineHeightPercentFontSize", "lineHeightPx"],
+  lineHeight: ["lineHeightPercent", "lineHeightPercentFontSize", "lineHeightPx", "lineHeightUnit"],
+  letterSpacing: ["letterSpacing"],
+  textAutoResize: ["textAutoResize"],
+  textDecoration: ["textDecoration"],
+  textCase: ["textCase"],
+  hyperlink: ["hyperlink"],
+  textAlignHorizontal: ["textAlignHorizontal"],
+  textAlignVertical: ["textAlignVertical"],
+  paragraphSpacing: ["paragraphSpacing"],
+  paragraphIndent: ["paragraphIndent"],
+  stackMode: ["layoutMode"],
+  stackSpacing: ["itemSpacing"],
+  stackPrimarySizing: ["primaryAxisSizingMode"],
+  stackCounterSizing: ["counterAxisSizingMode"],
+  stackPrimaryAlignItems: ["primaryAxisAlignItems"],
+  stackCounterAlignItems: ["counterAxisAlignItems"],
+  stackHorizontalPadding: ["paddingLeft"],
+  stackPaddingRight: ["paddingRight"],
+  stackVerticalPadding: ["paddingTop"],
+  stackPaddingBottom: ["paddingBottom"],
+  stackPositioning: ["layoutPositioning"],
+  stackChildAlignSelf: ["layoutAlign"],
+  stackChildPrimaryGrow: ["layoutGrow"],
+  minSize: ["minHeight", "minWidth"],
+  maxSize: ["maxHeight", "maxWidth"],
+};
+
+/** A FRAME Figma made for a group: never clips, always hugs its children, never painted. */
+function isGroupFrame(n: FigNode): boolean {
+  return (
+    n.type === "FRAME" &&
+    n.resizeToFit === true &&
+    n.frameMaskDisabled === false &&
+    !n.fillPaints?.length &&
+    !n.strokePaints?.length &&
+    !(n as any).backgroundPaints?.length
+  );
+}
+
+function restType(n: FigNode): string {
+  switch (n.type) {
+    case "SYMBOL": return "COMPONENT";
+    case "ROUNDED_RECTANGLE": return "RECTANGLE";
+    case "FRAME":
+      if ((n as any).isStateGroup) return "COMPONENT_SET";
+      return isGroupFrame(n) ? "GROUP" : "FRAME";
+    default: return n.type;
+  }
+}
+
+const FRAME_LIKE = new Set(["FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INSTANCE"]);
+
+/** The only fields REST gives a SECTION besides its id, name and children. */
+const SECTION_FIELDS = new Set([
+  "id", "name", "type", "visible", "locked", "scrollBehavior", "children", "fills", "fillGeometry",
+  "strokes", "strokeWeight", "strokeAlign", "strokeGeometry", "absoluteBoundingBox", "absoluteRenderBounds",
+  "relativeTransform", "size", "sectionContentsHidden", "boundVariables",
+]);
+
+/** Types REST never gives corner fields. */
+const NO_CORNERS = new Set(["BOOLEAN_OPERATION", "ELLIPSE", "SECTION", "LINE", "TEXT", "GROUP"]);
+
+/**
+ * cornerRadius when the corners agree, rectangleCornerRadii when they were set
+ * independently and differ; cornerSmoothing alongside either.
+ */
+function corners(n: any): Record<string, unknown> {
+  if (n.rectangleCornerRadiiIndependent) {
+    const radii = [
+      n.rectangleTopLeftCornerRadius ?? 0,
+      n.rectangleTopRightCornerRadius ?? 0,
+      n.rectangleBottomRightCornerRadius ?? 0,
+      n.rectangleBottomLeftCornerRadius ?? 0,
+    ];
+    if (radii.some((r) => r !== radii[0])) return { cornerSmoothing: n.cornerSmoothing ?? 0, rectangleCornerRadii: radii };
+    return radii[0] ? { cornerRadius: radii[0], cornerSmoothing: n.cornerSmoothing ?? 0 } : {};
+  }
+  return n.cornerRadius ? { cornerRadius: n.cornerRadius, cornerSmoothing: n.cornerSmoothing ?? 0 } : {};
+}
+
+const GRID_ALIGN: Record<string, Rest.LayoutGrid["alignment"]> = { MIN: "MIN", CENTER: "CENTER", MAX: "MAX", STRETCH: "STRETCH" };
+
+function layoutGrids(list: any[] | undefined): Rest.LayoutGrid[] | undefined {
+  if (!list?.length) return undefined;
+  return list.map((g) => {
+    const grid = g.pattern === "GRID";
+    const count = g.numSections;
+    return {
+      pattern: grid ? "GRID" : g.axis === "Y" ? "ROWS" : "COLUMNS",
+      sectionSize: g.sectionSize ?? 0,
+      visible: g.visible !== false,
+      color: color(g.color),
+      alignment: grid ? "MIN" : GRID_ALIGN[g.type] ?? "MIN",
+      gutterSize: grid ? 0 : g.gutterSize ?? 0,
+      offset: grid ? 0 : g.offset ?? 0,
+      count: grid || count === undefined || count > 1e6 ? -1 : count,
+    } as Rest.LayoutGrid;
+  });
+}
+
+function isSentinel(guid: any): boolean {
+  return guid?.sessionID === SENTINEL && guid?.localID === SENTINEL;
+}
+
+function boundingBox(abs: FigTransform, w: number, h: number): Rest.Rectangle {
+  const pts = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => [
+    abs.m00 * x + abs.m01 * y + abs.m02,
+    abs.m10 * x + abs.m11 * y + abs.m12,
+  ]);
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+}
+
+function geometry(ctx: Ctx, list: any[] | undefined): Rest.Path[] {
+  const out: Rest.Path[] = [];
+  for (const g of list ?? []) {
+    const bytes = g?.commandsBlob !== undefined ? getBlobBytes(ctx.doc, g.commandsBlob) : undefined;
+    if (!bytes) continue;
+    const svg = geometryBlobToSVGPath(bytes, { strict: false });
+    if (!svg) continue;
+    const path: any = { path: svg, windingRule: g.windingRule === "ODD" ? "EVENODD" : "NONZERO" };
+    if (g.styleID) path.overrideID = g.styleID;
+    out.push(path);
+  }
+  return out;
+}
+
+/** The style node a `styleIdFor*` reference names, if it is in the file. */
+function styleNode(ctx: Ctx, ref: any): FigNode | undefined {
+  if (ref?.guid) return isSentinel(ref.guid) ? undefined : ctx.doc.nodeMap.get(guidString(ref.guid));
+  const key = ref?.assetRef?.key;
+  return key ? ctx.byKey.get(key) : undefined;
+}
+
+function styleId(ctx: Ctx, ref: any): string | undefined {
+  if (ref?.guid) return isSentinel(ref.guid) ? undefined : guidString(ref.guid);
+  const key = ref?.assetRef?.key;
+  const node = key ? ctx.byKey.get(key) : undefined;
+  return node ? nodeId(node)! : undefined;
+}
+
+function styles(ctx: Ctx, n: any, type: string): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  const set = (k: string, ref: any) => { const id = styleId(ctx, ref); if (id) out[k] = id; };
+  set("fill", n.styleIdForFill);
+  set("stroke", n.styleIdForStrokeFill);
+  set("text", n.styleIdForText);
+  set("effect", n.styleIdForEffect);
+  set("grid", n.styleIdForGrid);
+  // Frames list fill and stroke styles under both names.
+  if (FRAME_LIKE.has(type)) {
+    if (out.fill) out.fills = out.fill;
+    if (out.stroke) out.strokes = out.stroke;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function boundVariables(n: any): Record<string, any> | undefined {
+  const out: any = {};
+  for (const e of n.variableConsumptionMap?.entries ?? []) {
+    const alias = variableAlias(e?.variableData);
+    if (!alias) continue;
+    const text = TEXT_VARIABLE_FIELDS[e.variableField];
+    if (text) { (out[text] ??= []).push(alias); continue; }
+    const [key, sub] = VARIABLE_FIELDS[e.variableField] ?? [];
+    if (!key) continue;
+    if (sub) (out[key] ??= {})[sub] = alias;
+    else out[key] = alias;
+  }
+  const paintAliases = (list: any[] | undefined) =>
+    (list ?? []).map((p) => variableAlias(p?.colorVar)).filter(Boolean);
+  const fills = paintAliases(n.fillPaints);
+  if (fills.length) out.fills = fills;
+  const strokes = paintAliases(n.strokePaints);
+  if (strokes.length) out.strokes = strokes;
+  const fx = (n.effects ?? []).map((e: any) => variableAlias(e?.colorVar)).filter(Boolean);
+  if (fx.length) out.effects = fx;
+  return Object.keys(out).length ? out : undefined;
+}
+
+function stackOf(n: any): "HORIZONTAL" | "VERTICAL" | "GRID" | undefined {
+  const m = n?.stackMode;
+  return m === "HORIZONTAL" || m === "VERTICAL" || m === "GRID" ? m : undefined;
+}
+
+/** Auto-layout fields of a container. */
+function layoutContainer(n: any, out: any): void {
+  const mode = stackOf(n);
+  if (!mode) return;
+  out.layoutMode = mode;
+  // kiwi omits stackCounterSizing when FIXED and stackPrimarySizing when it hugs.
+  const primary = n.stackPrimarySizing ?? "RESIZE_TO_FIT_WITH_IMPLICIT_SIZE";
+  const counter = n.stackCounterSizing ?? "FIXED";
+  if (counter === "FIXED") out.counterAxisSizingMode = "FIXED";
+  if (primary === "FIXED") out.primaryAxisSizingMode = "FIXED";
+  const justify = n.stackPrimaryAlignItems;
+  if (justify && justify !== "MIN") out.primaryAxisAlignItems = justify === "SPACE_EVENLY" ? "SPACE_BETWEEN" : justify;
+  const align = n.stackCounterAlignItems;
+  if (align && align !== "MIN") out.counterAxisAlignItems = align;
+  if (n.stackHorizontalPadding) out.paddingLeft = n.stackHorizontalPadding;
+  if (n.stackPaddingRight) out.paddingRight = n.stackPaddingRight;
+  if (n.stackVerticalPadding) out.paddingTop = n.stackVerticalPadding;
+  if (n.stackPaddingBottom) out.paddingBottom = n.stackPaddingBottom;
+  if (n.stackSpacing) out.itemSpacing = n.stackSpacing;
+  if (n.stackReverseZIndex) out.itemReverseZIndex = true;
+  if (n.bordersTakeSpace) out.strokesIncludedInLayout = true;
+  out.layoutWrap = n.stackWrap === "WRAP" ? "WRAP" : "NO_WRAP";
+  if (n.stackWrap === "WRAP") {
+    // NaN: the same gap as between items.
+    out.counterAxisSpacing = Number.isFinite(n.stackCounterSpacing) ? n.stackCounterSpacing : n.stackSpacing ?? 0;
+    out.counterAxisAlignContent = n.stackCounterAlignContent === "SPACE_BETWEEN" ? "SPACE_BETWEEN" : "AUTO";
+  }
+}
+
+/** Sizing of one axis: FIXED, HUG (sizes to content) or FILL (stretches in the parent). */
+function axisSizing(n: any, parent: any, axis: "H" | "V"): "FIXED" | "HUG" | "FILL" {
+  const parentMode = stackOf(parent);
+  const absolute = n.stackPositioning === "ABSOLUTE";
+  if (parentMode && parentMode !== "GRID" && !absolute) {
+    const primary = (parentMode === "HORIZONTAL") === (axis === "H");
+    if (primary ? n.stackChildPrimaryGrow === 1 : n.stackChildAlignSelf === "STRETCH") return "FILL";
+  }
+  const mode = stackOf(n);
+  if (mode && mode !== "GRID") {
+    const primary = (mode === "HORIZONTAL") === (axis === "H");
+    const sizing = primary ? n.stackPrimarySizing ?? "RESIZE_TO_FIT_WITH_IMPLICIT_SIZE" : n.stackCounterSizing ?? "FIXED";
+    return sizing === "FIXED" ? "FIXED" : "HUG";
+  }
+  if (n.type === "TEXT") {
+    if (n.textAutoResize === "WIDTH_AND_HEIGHT") return "HUG";
+    if (n.textAutoResize === "HEIGHT" && axis === "V") return "HUG";
+  }
+  return "FIXED";
+}
+
+function layoutChild(n: any, parent: any, out: any): void {
+  const inStack = !!stackOf(parent);
+  if (inStack) {
+    out.layoutAlign = n.stackChildAlignSelf === "STRETCH" ? "STRETCH" : "INHERIT";
+    out.layoutGrow = n.stackChildPrimaryGrow === 1 ? 1 : 0;
+    if (n.stackPositioning === "ABSOLUTE") out.layoutPositioning = "ABSOLUTE";
+  }
+  if (inStack || stackOf(n)) {
+    out.layoutSizingHorizontal = axisSizing(n, parent, "H");
+    out.layoutSizingVertical = axisSizing(n, parent, "V");
+  }
+  const min = n.minSize?.value;
+  const max = n.maxSize?.value;
+  if (min?.x) out.minWidth = min.x;
+  if (min?.y) out.minHeight = min.y;
+  if (max?.x && max.x < 1e9) out.maxWidth = max.x;
+  if (max?.y && max.y < 1e9) out.maxHeight = max.y;
+}
+
+const EXPORT_FORMATS: Record<string, Rest.ExportSetting["format"]> = { PNG: "PNG", JPEG: "JPG", SVG: "SVG", PDF: "PDF" };
+const EXPORT_CONSTRAINTS: Record<string, Rest.ExportSetting["constraint"]["type"]> = {
+  CONTENT_SCALE: "SCALE", CONTENT_WIDTH: "WIDTH", CONTENT_HEIGHT: "HEIGHT",
+};
+
+function exportSettings(list: any[] | undefined): Rest.ExportSetting[] | undefined {
+  const out: Rest.ExportSetting[] = [];
+  for (const s of list ?? []) {
+    const format = EXPORT_FORMATS[s?.imageType];
+    if (!format) continue;
+    out.push({
+      suffix: s.suffix ?? "",
+      format,
+      constraint: { type: EXPORT_CONSTRAINTS[s.constraint?.type] ?? "SCALE", value: s.constraint?.value ?? 1 },
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+function propKey(def: any): string {
+  return def.type === "VARIANT" ? def.name : `${def.name}#${guidString(def.id)}`;
+}
+
+/** Definitions of a component or component set, keyed as REST keys them. */
+function propDefs(ctx: Ctx, n: any): Record<string, Rest.ComponentPropertyDefinition> | undefined {
+  const defs: any[] = (n.componentPropDefs ?? []).filter((d: any) => !d?.isDeleted);
+  if (!defs.length) return undefined;
+  const orders = new Map<string, string[]>(
+    (n.stateGroupPropertyValueOrders ?? []).map((o: any) => [o.property, o.values]),
+  );
+  const out: Record<string, any> = {};
+  for (const d of [...defs].sort((a, b) => comparePosition(a.sortPosition, b.sortPosition))) {
+    const def: any = { type: d.type };
+    const v = d.initialValue ?? {};
+    switch (d.type) {
+      case "BOOLEAN": def.defaultValue = v.boolValue ?? false; break;
+      case "TEXT": def.defaultValue = v.textValue?.characters ?? ""; break;
+      case "INSTANCE_SWAP": {
+        const target = v.guidValue ? ctx.doc.nodeMap.get(guidString(v.guidValue)) : undefined;
+        def.defaultValue = target ? nodeId(target) : v.guidValue ? guidString(v.guidValue) : "";
+        def.preferredValues = [];
+        break;
+      }
+      case "VARIANT": {
+        const values = orders.get(d.name) ?? [];
+        def.defaultValue = values[0] ?? "";
+        def.variantOptions = values;
+        break;
+      }
+    }
+    out[propKey(d)] = def;
+  }
+  return out;
+}
+
+/** Variant values of a component in a set, from its `Prop=Value, ...` name. */
+function variantValues(name: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of name.split(",")) {
+    const i = part.indexOf("=");
+    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  return out;
+}
+
+function ownerOf(ctx: Ctx, symbol: FigNode): FigNode {
+  const parent = symbol.parentIndex ? ctx.doc.nodeMap.get(guidString(symbol.parentIndex.guid)) : undefined;
+  return (parent as any)?.isStateGroup ? parent! : symbol;
+}
+
+function componentProperties(ctx: Ctx, instance: any, symbol: FigNode | undefined): Record<string, Rest.ComponentProperty> | undefined {
+  if (!symbol) return undefined;
+  const owner: any = ownerOf(ctx, symbol);
+  const defs: any[] = (owner.componentPropDefs ?? []).filter((d: any) => !d?.isDeleted);
+  if (!defs.length) return undefined;
+  const assigned = new Map<string, any>(
+    (instance.componentPropAssignments ?? []).map((a: any) => [guidString(a.defID), a]),
+  );
+  const variants = variantValues(symbol.name ?? "");
+  const out: Record<string, any> = {};
+  for (const d of defs) {
+    const a = assigned.get(guidString(d.id));
+    const v = a?.value ?? d.initialValue ?? {};
+    const prop: any = { type: d.type };
+    switch (d.type) {
+      case "VARIANT": prop.value = variants[d.name] ?? ""; break;
+      case "BOOLEAN": prop.value = v.boolValue ?? false; break;
+      case "TEXT": prop.value = v.textValue?.characters ?? ""; break;
+      case "INSTANCE_SWAP": prop.value = v.guidValue ? guidString(v.guidValue) : ""; prop.preferredValues = []; break;
+    }
+    prop.boundVariables = {};
+    out[propKey(d)] = prop;
+  }
+  return out;
+}
+
+function propertyReferences(n: any, owner: FigNode | undefined): Record<string, string> | undefined {
+  const refs: any[] = (n.componentPropRefs ?? []).filter((r: any) => !r?.isDeleted);
+  if (!refs.length || !owner) return undefined;
+  const defs = new Map<string, any>(((owner as any).componentPropDefs ?? []).map((d: any) => [guidString(d.id), d]));
+  const FIELDS: Record<string, string> = { VISIBLE: "visible", TEXT_DATA: "characters", OVERRIDDEN_SYMBOL_ID: "mainComponent" };
+  const out: Record<string, string> = {};
+  for (const r of refs) {
+    const field = FIELDS[r.componentPropNodeField];
+    const def = defs.get(guidString(r.defID));
+    if (field && def) out[field] = propKey(def);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** An instance's own overrides, as REST field names, by path from `base`. */
+function ownOverrides(source: any, base: string[]): OuterOverride[] {
+  const out: OuterOverride[] = [];
+  for (const e of source.symbolData?.symbolOverrides ?? []) {
+    const path: string[] = (e?.guidPath?.guids ?? []).map(guidString);
+    if (!path.length) continue;
+    const fields = Object.keys(e).flatMap((k) => OVERRIDE_FIELDS[k] ?? []);
+    out.push({ path: [...base, ...path], fields });
+  }
+  return out;
+}
+
+/**
+ * REST `overrides`: the sublayers of this instance whose fields an enclosing
+ * instance — or, for an outermost instance, the instance itself — overrides.
+ * A nested instance does not list the overrides it carries in its component.
+ */
+function overrides(entries: OuterOverride[], self: string[], selfKey: string, root: string, id: string): Rest.Overrides[] {
+  const byId = new Map<string, Set<string>>();
+  for (const e of entries) {
+    if (e.path.length < self.length || self.some((k, i) => e.path[i] !== k)) continue;
+    const rest = e.path.slice(self.length);
+    const target = rest.length === 0 || (rest.length === 1 && rest[0] === selfKey) ? id : `I${root};${e.path.join(";")}`;
+    const fields = byId.get(target) ?? new Set<string>();
+    for (const f of e.fields) fields.add(f);
+    byId.set(target, fields);
+  }
+  const out: Rest.Overrides[] = [];
+  for (const [target, fields] of byId) if (fields.size) out.push({ id: target, overriddenFields: [...fields].sort() });
+  // The instance's own entry comes first.
+  return out.sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+}
+
+function withModes(ctx: Ctx, modes: Map<string, FigGuid>, n: any): Map<string, FigGuid> {
+  const entries: any[] = n.variableModeBySetMap?.entries ?? [];
+  if (!entries.length) return modes;
+  const next = new Map(modes);
+  for (const e of entries) {
+    const set = findVariableSet(ctx.doc, e?.variableSetID);
+    if (set && e.variableModeID) next.set(nodeId(set)!, e.variableModeID);
+  }
+  return next;
+}
+
+function flowStartingPoints(ctx: Ctx, r: ResolvedNode): Rest.FlowStartingPoint[] {
+  return r.children
+    .filter((c) => (c.node as any).prototypeStartingPoint)
+    .sort((a, b) => comparePosition((a.node as any).prototypeStartingPoint.position, (b.node as any).prototypeStartingPoint.position))
+    .map((c) => ({ nodeId: nodeId(c.source)!, name: (c.node as any).prototypeStartingPoint.name ?? "" }));
+}
+
+function fillOverrideTable(ctx: Ctx, n: any, resolve: ColorResolver): Record<string, any> | undefined {
+  const table: any[] = n.vectorData?.styleOverrideTable ?? [];
+  if (!table.length) return undefined;
+  const out: Record<string, any> = {};
+  for (const entry of table) {
+    if (entry?.styleID === undefined) continue;
+    out[String(entry.styleID)] = entry.fillPaints ? { fills: paints(entry.fillPaints, resolve) } : null;
+  }
+  return out;
+}
+
+function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
+  const n: any = r.node;
+  const id = r.path.length && scope.instanceRoot
+    ? `I${scope.instanceRoot};${r.path.map(guidString).join(";")}`
+    : nodeId(r.source)!;
+  const type = restType(n);
+  const out: any = { id, name: n.name ?? "", type };
+  if (n.visible === false) out.visible = false;
+  if (n.locked) out.locked = true;
+  out.scrollBehavior = n.scrollBehavior === "FIXED_WHEN_CHILD_OF_SCROLLING_FRAME" ? "FIXED" : n.scrollBehavior ?? "SCROLLS";
+
+  const modes = withModes(ctx, scope.modes, n);
+  const resolve: ColorResolver = (colorVar) => {
+    const v = resolveVariableData(ctx.doc, colorVar, { modes });
+    return v?.type === "COLOR" ? (v.value as FigColor) : undefined;
+  };
+
+  if (type === "DOCUMENT" || type === "CANVAS") {
+    if (type === "CANVAS") {
+      out.backgroundColor = color(n.backgroundColor);
+      const flows = flowStartingPoints(ctx, r);
+      out.prototypeStartNodeID = n.prototypeStartNodeID && !isSentinel(n.prototypeStartNodeID)
+        ? guidString(n.prototypeStartNodeID)
+        : flows[0]?.nodeId ?? null;
+      out.flowStartingPoints = flows;
+      out.prototypeDevice = { type: "NONE", rotation: "NONE" };
+    }
+    out.children = r.children
+      .filter((c) => !(c.node as any).internalOnly)
+      .map((c) => convert(ctx, c, { ...scope, parent: n, abs: IDENTITY_TRANSFORM, modes }));
+    return out;
+  }
+
+  const rel: FigTransform = n.transform ?? IDENTITY_TRANSFORM;
+  const abs = multiplyTransform(scope.abs, rel);
+  const hidden = scope.hidden || n.visible === false;
+  const size = { x: n.size?.x ?? 0, y: n.size?.y ?? 0 };
+  const rot = Math.atan2(rel.m10, rel.m00);
+  if (rot !== 0) out.rotation = rot;
+
+  const refs = propertyReferences(n, scope.propOwner);
+  if (refs) out.componentPropertyReferences = refs;
+  const bound = boundVariables(n);
+  if (bound) out.boundVariables = bound;
+
+  // A scaled instance (K-scaled in Figma) scales its own lengths and those of its contents.
+  const scale = scope.scale * (type === "INSTANCE" ? n.symbolData?.uniformScaleFactor ?? 1 : 1);
+  let symbol: FigNode | undefined;
+  if (type === "INSTANCE") {
+    symbol = n.symbolData?.symbolID ? ctx.doc.nodeMap.get(guidString(n.symbolData.symbolID)) : undefined;
+    out.componentId = symbol ? nodeId(symbol)! : n.symbolData?.symbolID ? guidString(n.symbolData.symbolID) : "";
+    const props = componentProperties(ctx, n, symbol);
+    if (props) out.componentProperties = props;
+    const shown = r.symbol ?? symbol;
+    const selfKey = shown ? guidString((shown as any).overrideKey ?? shown.guid) : "";
+    const self = r.path.map(guidString);
+    const entries = self.length ? scope.outer : ownOverrides(r.source, []);
+    out.overrides = overrides(entries, self, selfKey, self.length ? scope.instanceRoot! : id, id);
+    const scale = n.symbolData?.uniformScaleFactor;
+    if (scale !== undefined && scale !== 1) out.uniformScaleFactor = scale;
+  }
+  if (type === "COMPONENT_SET" || (type === "COMPONENT" && !(scope.parent as any)?.isStateGroup)) {
+    const defs = propDefs(ctx, n);
+    if (defs) out.componentPropertyDefinitions = defs;
+  }
+
+  out.blendMode = n.blendMode ?? "PASS_THROUGH";
+  if (n.opacity !== undefined && n.opacity !== 1) out.opacity = n.opacity;
+  if (n.mask) {
+    out.isMask = true;
+    out.maskType = n.maskType === "OUTLINE" ? "VECTOR" : n.maskType === "LUMINANCE" ? "LUMINANCE" : "ALPHA";
+  }
+  const fillStyle = styleNode(ctx, n.styleIdForFill);
+  const strokeStyle = styleNode(ctx, n.styleIdForStrokeFill);
+  const effectStyle = styleNode(ctx, n.styleIdForEffect);
+  const fills = paints((fillStyle as any)?.fillPaints ?? n.fillPaints, resolve);
+  if (FRAME_LIKE.has(type)) {
+    out.clipsContent = type === "GROUP" ? false : n.frameMaskDisabled !== true;
+    out.background = fills;
+  }
+  out.fills = fills;
+  out.strokes = paints((strokeStyle as any)?.fillPaints ?? n.strokePaints, resolve);
+  if (!NO_CORNERS.has(type)) Object.assign(out, corners(n));
+  out.strokeWeight = n.strokeWeight ?? 1;
+  out.strokeAlign = n.strokeAlign ?? "CENTER";
+  if (n.strokeCap && n.strokeCap !== "NONE") out.strokeCap = n.strokeCap;
+  if (n.strokeJoin && n.strokeJoin !== "MITER") out.strokeJoin = n.strokeJoin;
+  if (n.dashPattern?.length) out.strokeDashes = n.dashPattern;
+  if (n.borderStrokeWeightsIndependent) {
+    out.individualStrokeWeights = {
+      top: n.borderTopWeight ?? 0, right: n.borderRightWeight ?? 0,
+      bottom: n.borderBottomWeight ?? 0, left: n.borderLeftWeight ?? 0,
+    };
+  }
+  if (FRAME_LIKE.has(type)) {
+    // The deprecated backgroundColor is the topmost visible fill, when that is a solid colour.
+    const top = [...fills].reverse().find((p: any) => p.visible !== false) as any;
+    out.backgroundColor = top?.type === "SOLID" ? { ...top.color, a: top.color.a * (top.opacity ?? 1) } : { r: 0, g: 0, b: 0, a: 0 };
+    layoutContainer(n, out);
+    const grids = layoutGrids(n.layoutGrids);
+    if (grids) out.layoutGrids = grids;
+  }
+  const fot = fillOverrideTable(ctx, n, resolve);
+  if (fot) out.fillOverrideTable = fot;
+  if (ctx.geometry) {
+    out.fillGeometry = geometry(ctx, n.fillGeometry);
+    out.strokeGeometry = geometry(ctx, n.strokeGeometry);
+  }
+  const st = styles(ctx, n, type);
+  if (st) {
+    out.styles = st;
+    for (const s of Object.values(st)) ctx.usedStyles.add(s);
+  }
+  if (type === "COMPONENT") ctx.usedComponents.add(id);
+  if (type === "INSTANCE" && out.componentId) ctx.usedComponents.add(out.componentId);
+
+  out.absoluteBoundingBox = boundingBox(abs, size.x, size.y);
+  out.absoluteRenderBounds = hidden ? null : out.absoluteBoundingBox;
+  out.constraints = {
+    vertical: CONSTRAINT_V[n.verticalConstraint ?? "MIN"] ?? "TOP",
+    horizontal: CONSTRAINT_H[n.horizontalConstraint ?? "MIN"] ?? "LEFT",
+  };
+  out.relativeTransform = [
+    [rel.m00, rel.m01, rel.m02],
+    [rel.m10, rel.m11, rel.m12],
+  ];
+  out.size = size;
+  if (scope.parent) layoutChild(n, scope.parent, out);
+
+  if (type === "TEXT") {
+    // Figma caches the scaled type of a scaled instance's text on the node; the
+    // text style no longer describes it, and REST does not report the style.
+    const scaled = scale !== 1;
+    Object.assign(out, textFields(n, (ref) => (scaled ? undefined : styleNode(ctx, ref)), resolve));
+    if (scaled && out.styles) {
+      delete out.styles.text;
+      if (!Object.keys(out.styles).length) delete out.styles;
+    }
+  }
+  if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
+  if (type === "ELLIPSE") {
+    out.arcData = {
+      startingAngle: n.arcData?.startingAngle ?? 0,
+      endingAngle: n.arcData?.endingAngle ?? 2 * Math.PI,
+      innerRadius: n.arcData?.innerRadius ?? 0,
+    };
+  }
+  if (type === "REGULAR_POLYGON" || type === "STAR") out.count = n.count ?? 3;
+  if (type === "STAR") out.starInnerScale = n.starInnerScale ?? 0.382;
+  if (type === "SECTION") out.sectionContentsHidden = n.sectionContentsHidden ?? false;
+  const exports = exportSettings(n.exportSettings);
+  if (exports) out.exportSettings = exports;
+  out.effects = effects((effectStyle as any)?.effects ?? n.effects, resolve);
+  out.interactions = interactions(n.prototypeInteractions);
+  if (type !== "BOOLEAN_OPERATION") out.complexStrokeProperties = { strokeType: "BASIC" };
+
+  if (r.children.length || FRAME_LIKE.has(type) || type === "BOOLEAN_OPERATION" || type === "SECTION") {
+    const childScope: Scope = {
+      parent: n,
+      abs,
+      hidden,
+      modes,
+      instanceRoot: r.path.length === 0 && type === "INSTANCE" ? id : scope.instanceRoot,
+      propOwner: type === "INSTANCE" ? (r.symbol ? ownerOf(ctx, r.symbol) : undefined)
+        : type === "COMPONENT" || type === "COMPONENT_SET" ? n : scope.propOwner,
+      scale,
+      outer: type !== "INSTANCE" ? scope.outer
+        : r.path.length === 0 ? ownOverrides(r.source, [])
+        : [...scope.outer, ...ownOverrides(r.source, r.path.map(guidString))],
+    };
+    out.children = r.children.map((c) => convert(ctx, c, childScope));
+  }
+  if (type === "SECTION") for (const k of Object.keys(out)) if (!SECTION_FIELDS.has(k)) delete out[k];
+  return out;
+}
+
+function componentMeta(n: any): any {
+  return {
+    key: n.componentKey ?? n.key ?? "",
+    name: n.name ?? "",
+    description: n.symbolDescription ?? n.description ?? "",
+    remote: !!n.sharedSymbolReference || !!n.sourceLibraryKey,
+    documentationLinks: [],
+  };
+}
+
+/**
+ * Convert a parsed file to the REST API's file JSON. Pass `{ geometry: true }`
+ * to include vector paths.
+ */
+export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): RestFile {
+  const root = doc.nodes.find((n) => n.type === "DOCUMENT");
+  if (!root) throw new Error("toRestDocument: no DOCUMENT node");
+  const byKey = new Map<string, FigNode>();
+  for (const n of doc.nodes) {
+    const key = (n as any).key ?? (n as any).componentKey;
+    if (key && n.phase !== "REMOVED") byKey.set(key, n);
+  }
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set() };
+  const document = convert(ctx, resolveTree(doc, root), {
+    abs: IDENTITY_TRANSFORM,
+    hidden: false,
+    modes: new Map(),
+    outer: [],
+    scale: 1,
+  });
+
+  const usedSets = new Set<string>();
+  for (const c of ctx.usedComponents) {
+    const parent = doc.nodeMap.get(c)?.parentIndex?.guid;
+    if (parent) usedSets.add(guidString(parent));
+  }
+  const components: Record<string, any> = {};
+  const componentSets: Record<string, any> = {};
+  const styleMap: Record<string, any> = {};
+  for (const n of doc.nodes as any[]) {
+    if (n.phase === "REMOVED") continue;
+    const nid = nodeId(n)!;
+    if (n.type === "SYMBOL") {
+      if (!ctx.usedComponents.has(nid)) continue;
+      const meta = componentMeta(n);
+      const parent = n.parentIndex ? doc.nodeMap.get(guidString(n.parentIndex.guid)) : undefined;
+      if ((parent as any)?.isStateGroup) meta.componentSetId = nodeId(parent!);
+      components[nodeId(n)!] = meta;
+    } else if (n.isStateGroup) {
+      if (!usedSets.has(nid)) continue;
+      const { remote, ...meta } = componentMeta(n);
+      componentSets[nodeId(n)!] = meta;
+    } else if (n.styleType && n.styleType !== "NONE") {
+      if (!ctx.usedStyles.has(nid)) continue;
+      styleMap[nodeId(n)!] = {
+        key: n.key ?? "",
+        name: n.name ?? "",
+        styleType: n.styleType,
+        remote: !!n.sharedStyleReference,
+        description: n.styleDescription ?? "",
+      };
+    }
+  }
+  return {
+    document,
+    components,
+    componentSets,
+    styles: styleMap,
+    schemaVersion: 0,
+    name: (doc.meta as any)?.file_name ?? "",
+  } as RestFile;
+}

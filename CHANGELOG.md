@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `toRestDocument(doc, { geometry })` — the file as Figma's REST API returns it (`GET /v1/files/:key`), typed with `@figma/rest-api-spec`, so tools written for the REST API can read a `.fig`. Instances are expanded with REST's sublayer ids, overrides are listed per instance, shared styles and bound variables show their current values, and layout, text, corner and interaction fields follow REST's names and defaults. Against REST responses for two community files (12,356 nodes), every node is produced and 99.78% of fields match; it converts all 179 readable files of a 181-file public corpus. `docs/rest.md` records the mapping rules and the known differences.
+- `findVariableSet`, the VARIABLE_SET a reference names.
 - The built-in schema (`figKiwiSchema.ts`) and `Kiwi` types are regenerated from a format-version-106 file: 631 definitions and 4,002 fields, up from 550 and 3,452. Its fields are a superset of the previous schema and of every schema in 181 public files, other than fields Figma has removed. Parsing never depended on it — files are decoded with their own embedded schema — but nodes from current files now type-check against `Kiwi`.
 - `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
 - `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
@@ -38,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `getAbsoluteTransform` and `getAbsoluteBoundingBox` — page coordinates, composed up to the node's `CANVAS`; with `multiplyTransform`, `applyTransform` and `IDENTITY_TRANSFORM`.
 
 ### Changed
+
+- Library variables and sets are looked up by key through a per-document index instead of a scan of every node.
+- `geometryBlobToSVGPath` finds the shortest exact float32 form of each coordinate by binary search, and integers directly: about 40% faster on large files. Output is unchanged.
 
 - `geometryBlobToSVGPath(blob, { precision, strict })` writes exact coordinates unless given a `precision`; pass `precision: 2` for the previous output. It now throws on an unknown opcode or truncated command, naming the byte offset; pass `strict: false` to get the decoded prefix instead. `resolveVectorNodePaths`, which calls it, throws in the same cases. No reference blob triggers either.
 

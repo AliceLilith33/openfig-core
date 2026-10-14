@@ -11,6 +11,7 @@ shared with standalone `.fig` files (Design).
 | Document | Description |
 |----------|-------------|
 | [archive.md](archive.md) | ZIP structure, canvas.fig binary layout, kiwi schema, encoding pipeline |
+| [rest.md](rest.md) | REST API view (`toRestDocument`) — kiwi → REST mapping rules and accuracy |
 | [encoder.md](encoder.md) | Encoding pipeline — encodeFigParts, assembleCanvasFig, createFigZip |
 | [template.md](template.md) | Empty .fig template — how it's generated, how to regenerate, compatibility notes |
 | [nodes.md](nodes.md) | Node structure, types, GUIDs, parentIndex, hierarchy, cached fields |

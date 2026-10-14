@@ -155,6 +155,17 @@ Aliases are followed, local (`guid`) and library (`assetRef.key`) references bot
 
 A bound colour's alpha comes back as `opacity`, with `color.a` set to 1 — the form Figma caches it in — so draw with `color.a * opacity`. `resolvePaintColor` returns just the colour.
 
+## REST API view
+
+```ts
+import { toRestDocument } from 'openfig-core';
+
+const file = toRestDocument(doc);                   // GetFileResponse-shaped: document, components, componentSets, styles
+const withPaths = toRestDocument(doc, { geometry: true }); // adds fillGeometry / strokeGeometry, as ?geometry=paths does
+```
+
+The result is what Figma's REST API returns for the same file, typed with `@figma/rest-api-spec`, so tools written for the REST API can read a local `.fig`. Instances are expanded with REST's sublayer ids (`I<instance>;<key>`), shared styles and bound variables show their current values, and layout, text and interaction fields follow REST's names and defaults. Checked against REST responses for two community files, 99.78% of fields match; [docs/rest.md](docs/rest.md) lists the mapping rules and the known differences.
+
 ## Encoding (write .fig files)
 
 ### Round-trip: open, edit, save
@@ -236,6 +247,7 @@ Detailed documentation of the Figma binary format is in [`docs/`](docs/):
 | [Overrides](docs/overrides.md) | Symbol overrides (text, image, nested) |
 | [Slides](docs/slides.md) | Slide dimensions, cloning, ordering |
 | [Modes](docs/modes.md) | Slides mode vs Design mode |
+| [REST view](docs/rest.md) | `toRestDocument`: kiwi → REST mapping rules, accuracy, known differences |
 | [Invariants](docs/invariants.md) | Hard rules and sentinel values |
 | [Research](docs/research.md) | Binary format analysis and references |
 
@@ -244,6 +256,7 @@ Detailed documentation of the Figma binary format is in [`docs/`](docs/):
 - [`fflate`](https://github.com/101arrowz/fflate) — ZIP extraction + deflate decompression
 - [`kiwi-schema`](https://github.com/nicbarker/kiwi-schema) — Kiwi binary format decoding
 - [`fzstd`](https://github.com/nicbarker/fzstd) — Zstandard decompression
+- [`@figma/rest-api-spec`](https://github.com/figma/rest-api-spec) — types of the REST API view (types only)
 
 ## License
 

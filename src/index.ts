@@ -18,6 +18,7 @@ export {
 export { resolveTree, resolveInstance, walkResolved, overrideKeyOf } from "./instance.js";
 export {
   findVariable,
+  findVariableSet,
   variableSetOf,
   variableModes,
   explicitModes,
@@ -28,6 +29,7 @@ export {
   resolveBoundVariables,
 } from "./variables.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
+export { toRestDocument } from "./rest/index.js";
 export {
   appendVectorPayloadToDocument,
   encodeCommandsBlob,
@@ -48,6 +50,7 @@ export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from 
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
 export type { ResolvedNode, ResolveOptions } from "./instance.js";
+export type { RestFile, ToRestOptions } from "./rest/index.js";
 export type { FigVariableRef, ResolveVariableOptions, ResolvedPaint, ResolvedVariableValue } from "./variables.js";
 export type {
   GradientFillLike,

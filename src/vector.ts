@@ -200,11 +200,18 @@ export function parseCommandsBlob(
 
 /** Shortest decimal string that reads back to the same float32. */
 function formatFloat32(n: number): string {
-  for (let digits = 1; digits < 9; digits++) {
-    const candidate = Number(n.toPrecision(digits));
-    if (Math.fround(candidate) === n) return String(candidate);
+  if (Number.isInteger(n)) return String(n);
+  // The shortest digit count that round-trips through float32. If d digits
+  // round-trip, so do d + 1, so binary search; 9 always suffices.
+  let lo = 1;
+  let hi = 9;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (Math.fround(Number(n.toPrecision(mid))) === n) hi = mid;
+    else lo = mid + 1;
   }
-  return String(n);
+  const candidate = Number(n.toPrecision(lo));
+  return Math.fround(candidate) === n ? String(candidate) : String(n);
 }
 
 export function geometryBlobToSVGPath(
