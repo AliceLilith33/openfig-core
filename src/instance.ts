@@ -50,6 +50,12 @@ export interface ResolveOptions {
   applyDerived?: boolean;
   /** Nested instances deeper than this are left unexpanded. Default 32. */
   maxDepth?: number;
+  /**
+   * Copy nodes shallowly, sharing their nested values with the document; a
+   * caller must then not write into them. A third faster on large files.
+   * Default `false` (deep copies).
+   */
+  shareValues?: boolean;
 }
 
 /** Override fields that are not node properties to copy. */
@@ -176,12 +182,18 @@ function liveSortedChildren(doc: FigDocument, id: string, includeRemoved: boolea
  * nesting past `maxDepth`, stops expanding at that instance.
  */
 export function resolveTree(doc: FigDocument, node: FigNode, options: ResolveOptions = {}): ResolvedNode {
-  const { includeRemoved = false, applyDerived = true, maxDepth = 32 } = options;
+  const { includeRemoved = false, applyDerived = true, maxDepth = 32, shareValues = false } = options;
 
   const resolve = (source: FigNode, scope: Scope): ResolvedNode => {
     const key = overrideKeyOf(source);
     const path = scope.prefix === null ? [] : [...scope.prefix, key];
-    const node = deepClone(source);
+    // Shared nested values are never written here: changes replace whole
+    // fields (`applyNodeChange`), and only `symbolData` is written into.
+    let node: FigNode;
+    if (shareValues) {
+      node = { ...source };
+      if (source.symbolData) node.symbolData = { ...source.symbolData };
+    } else node = deepClone(source);
 
     const outerOverrides = addressed(scope.overrides, key);
     const outerDerived = applyDerived ? addressed(scope.derived, key) : [];

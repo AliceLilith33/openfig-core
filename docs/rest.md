@@ -76,7 +76,9 @@ height comes from `derivedTextData.fontMetaData`.
 style shows the style node's current paints or effects, and a text using a
 text style shows the style's font, size, line height, spacing, case and
 decoration — not the copies cached on the node, which go stale when the style
-is edited. (Exception: text inside a scaled instance keeps its own, scaled,
+is edited. `boundVariables.fills`, `strokes` and `effects` follow suit: they
+name the style's variables, and none for a style without them, whatever the
+cached paints bind (6 frames of Auto Layout Playground). (Exception: text inside a scaled instance keeps its own, scaled,
 values and drops the style reference.) Frames list `fill`/`stroke` style ids
 under `fills`/`strokes` as well.
 
@@ -108,7 +110,11 @@ name them.
 **Text styles' variables.** A text style binds its font size, family and
 weight on the style node; REST shows those bindings on each text that uses the
 style and binds nothing itself. A binding on the font style is the weight when
-its value is a number and the style name when it is a string.
+its value is a number and the style name when it is a string. (All 16 text
+styles of the Simple Design System agree with its `styles.json`, made from
+REST.) What REST shows when a text binds a field itself and its style binds
+another has not been seen: of 2,216 texts in the corpus with their own
+bindings, none uses a text style.
 
 **Render bounds.** `absoluteRenderBounds` is the extent of what is drawn: the
 fill and stroke outlines of a shape (an inside stroke drawn only within the

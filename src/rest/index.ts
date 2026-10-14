@@ -57,6 +57,8 @@ interface Ctx {
   /** Each converted node's painted area, clipped, even where REST reports null (masks, operands). */
   painted: WeakMap<object, Rect | null>;
   textLines?: Map<string, TextLine[]>;
+  /** SVG path of each geometry blob already written: instances share their components' blobs. */
+  paths: Map<Uint8Array, string>;
 }
 
 /** What a node inherits from the nodes above it in the expanded tree. */
@@ -305,7 +307,8 @@ function geometry(ctx: Ctx, list: any[] | undefined): Rest.Path[] {
   for (const g of list ?? []) {
     const bytes = g?.commandsBlob !== undefined ? getBlobBytes(ctx.doc, g.commandsBlob) : undefined;
     if (!bytes) continue;
-    const svg = geometryBlobToSVGPath(bytes, { strict: false, significantDigits: 6 });
+    let svg = ctx.paths.get(bytes);
+    if (svg === undefined) ctx.paths.set(bytes, (svg = geometryBlobToSVGPath(bytes, { strict: false, significantDigits: 6 })));
     if (!svg) continue;
     // In the order REST writes the keys.
     const path: any = { path: svg };
@@ -367,7 +370,7 @@ function styles(ctx: Ctx, n: any, type: string): Record<string, string> | undefi
   return Object.keys(out).length ? out : undefined;
 }
 
-function boundVariables(n: any, textStyle?: any): Record<string, any> | undefined {
+function boundVariables(ctx: Ctx, n: any, textStyle?: any): Record<string, any> | undefined {
   const out: any = {};
   for (const e of n.variableConsumptionMap?.entries ?? []) {
     const text = textBinding(e);
@@ -384,13 +387,17 @@ function boundVariables(n: any, textStyle?: any): Record<string, any> | undefine
     const text = textBinding(e);
     if (text && !out[text[0]]) out[text[0]] = [text[1]];
   }
+  // Paints and effects bind what is shown: a style's, not the node's stale copies.
+  const fillStyle: any = styleNode(ctx, styleRef(ctx, n, "styleIdForFill"));
+  const strokeStyle: any = styleNode(ctx, styleRef(ctx, n, "styleIdForStrokeFill"));
+  const effectStyle: any = styleNode(ctx, styleRef(ctx, n, "styleIdForEffect"));
   const paintAliases = (list: any[] | undefined) =>
     (list ?? []).map((p) => variableAlias(p?.colorVar)).filter(Boolean);
-  const fills = paintAliases(n.fillPaints);
+  const fills = paintAliases(fillStyle?.fillPaints ?? n.fillPaints);
   if (fills.length) out.fills = fills;
-  const strokes = paintAliases(n.strokePaints);
+  const strokes = paintAliases(strokeStyle?.fillPaints ?? n.strokePaints);
   if (strokes.length) out.strokes = strokes;
-  const fx = (n.effects ?? []).map((e: any) => variableAlias(e?.colorVar)).filter(Boolean);
+  const fx = (effectStyle?.effects ?? n.effects ?? []).map((e: any) => variableAlias(e?.colorVar)).filter(Boolean);
   if (fx.length) out.effects = fx;
   return Object.keys(out).length ? out : undefined;
 }
@@ -775,7 +782,7 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
 
   const refs = propertyReferences(ctx, n, scope.propOwner);
   if (refs) out.componentPropertyReferences = refs;
-  const bound = boundVariables(n, type === "TEXT" ? styleNode(ctx, textStyleRef(n)) : undefined);
+  const bound = boundVariables(ctx, n, type === "TEXT" ? styleNode(ctx, textStyleRef(n)) : undefined);
   if (bound) out.boundVariables = bound;
   const explicit = explicitVariableModes(ctx, n);
   if (explicit) out.explicitVariableModes = explicit;
@@ -982,8 +989,8 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines };
-  const document = convert(ctx, resolveTree(doc, root), {
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, paths: new Map() };
+  const document = convert(ctx, resolveTree(doc, root, { shareValues: true }), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,
     modes: new Map(),

@@ -97,6 +97,22 @@ describe("toRestDocument", () => {
     expect(Object.keys(file.styles).sort()).toEqual(["1:50", "1:51"]);
   });
 
+  it("binds the variables of the paints a style shows, not those of the node's cached paints", () => {
+    const alias = (localID: number) => ({ dataType: "ALIAS", value: { alias: { guid: G(localID) } } });
+    const solid = (colorVar?: object) => [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 }, ...(colorVar ? { colorVar } : {}) }];
+    const doc = docOf([
+      { id: 50, parent: 100, type: "RECTANGLE", styleType: "FILL", name: "Plain", fillPaints: solid() } as any,
+      { id: 51, parent: 100, type: "RECTANGLE", styleType: "FILL", name: "Bound", fillPaints: solid(alias(61)) } as any,
+      // Auto Layout Playground 2412:2036: Figma lists no binding for such a frame.
+      { id: 1, parent: 100, type: "FRAME", fillPaints: solid(alias(60)), styleIdForFill: { guid: G(50) } } as any,
+      { id: 2, parent: 100, type: "RECTANGLE", fillPaints: solid(), styleIdForFill: { guid: G(51) }, strokePaints: solid(alias(60)), styleIdForStrokeFill: { guid: G(51) } } as any,
+    ]);
+    const rest = index(toRestDocument(doc).document);
+    const v = (localID: number) => ({ type: "VARIABLE_ALIAS", id: `VariableID:1:${localID}` });
+    expect(rest.get("1:1").boundVariables).toBeUndefined();
+    expect(rest.get("1:2").boundVariables).toEqual({ fills: [v(61)], strokes: [v(61)] });
+  });
+
   it("reads the text style of older files from inheritTextStyleID", () => {
     // Figma lays the text out at the style's 16px; the node still caches 35px.
     const doc = docOf([
