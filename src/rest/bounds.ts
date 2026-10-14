@@ -37,7 +37,7 @@ export function intersect(a: Rect | null, b: Rect | null | undefined): Rect | nu
 }
 
 /** Tracks the bounding box of points in absolute coordinates. */
-class Extent {
+export class Extent {
   x0 = Infinity;
   y0 = Infinity;
   x1 = -Infinity;
@@ -54,7 +54,7 @@ class Extent {
 }
 
 /** Parameters in (0, 1) where a quadratic or cubic Bézier in one coordinate turns. */
-function turns(p: number[]): number[] {
+export function turns(p: number[]): number[] {
   let a: number, b: number, c: number;
   if (p.length === 3) {
     const d = p[0] - 2 * p[1] + p[2];
@@ -70,7 +70,7 @@ function turns(p: number[]): number[] {
   return [(-b + s) / (2 * a), (-b - s) / (2 * a)].filter((t) => t > 0 && t < 1);
 }
 
-function bezier(p: number[], t: number): number {
+export function bezier(p: number[], t: number): number {
   const u = 1 - t;
   return p.length === 3 ? u * u * p[0] + 2 * u * t * p[1] + t * t * p[2]
     : u * u * u * p[0] + 3 * u * u * t * p[1] + 3 * u * t * t * p[2] + t * t * t * p[3];

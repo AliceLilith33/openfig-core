@@ -83,6 +83,11 @@ export interface IRNode {
   transform?: [a: number, b: number, c: number, d: number];
   /** Rotation in degrees, clockwise, for reading; `transform` is exact. */
   rotation?: number;
+  /**
+   * With `transform`: the bounding box of the transformed node in its
+   * parent's box — where it shows, and the box Figma's auto layout gives it.
+   */
+  bounds?: { x: number; y: number; width: number; height: number };
 
   // -- In its parent --
   /** Placed absolutely inside an auto-layout parent. */

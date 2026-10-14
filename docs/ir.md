@@ -6,7 +6,7 @@ needs. It is meant to be read by code generators and by agents that write
 front-end code, and is built on top of the [REST view](rest.md):
 
 ```ts
-import { parseFig, designFromFig, toDesignIR, toRestDocument, toRestVariables } from 'openfig-core';
+import { parseFig, designFromFig, screenIR, toDesignIR, toRestDocument, toRestVariables } from 'openfig-core';
 
 const ir = designFromFig(parseFig(bytes));
 
@@ -15,6 +15,9 @@ const ir2 = toDesignIR(toRestDocument(doc, { geometry: true }), {
   variables: toRestVariables(doc),   // or GET /v1/files/:key/variables/local
   images: doc.images,                // optional: image sizes and types
 });
+
+// One screen, with only what it uses:
+const home = screenIR(ir, '12:345');
 ```
 
 Types are exported from the package (`DesignIR`, `IRNode`, ...) and documented
@@ -42,7 +45,8 @@ DesignIR
   pinned left and top.
 - `x`, `y`, `width`, `height` are the node's own, untransformed box in its
   parent's box. A rotated or flipped node adds `transform: [a, b, c, d]`, to be
-  applied with `transform-origin: 0 0`; `rotation` is for reading.
+  applied with `transform-origin: 0 0`; `rotation` is for reading. See
+  [Position and transform](#position-and-transform).
 
 ## How Figma maps to the IR
 
@@ -82,7 +86,11 @@ page:
   text, images, effects, interactions or auto layout), are drawn as SVG:
   `asset` names an entry of `assets.svgs`, and the node's children are left out.
   Frames and groups up to 160px (`iconMaxSize`), any instance, and anything
-  marked for SVG export qualify. Identical artwork shares one entry.
+  marked for SVG export qualify. Identical artwork shares one entry. An
+  entry's `width` and `height` are the node's; its `viewBox` grows past them,
+  from a negative origin if need be, when strokes or caps are drawn outside
+  the node (a line of zero height, an arrow head). A vector filled with an
+  image stays a vector node with that fill.
 - **Hidden layers.** A hidden layer is dropped unless a component property can
   show it (`propRefs.visible`); then it is kept with `visible: false`.
 - **Tokens.** Token names are the variables' names. A library collection copied
@@ -90,6 +98,132 @@ page:
   plain name and the others are prefixed by their collection. Each token has a
   CSS custom property name: its web code syntax when set, else one made from
   its name.
+
+## One screen (`screenIR`)
+
+`screenIR(ir, screenId)` cuts the IR down to one screen: its page with only
+that screen and the flows starting there; the components its instances use
+(by `component.id`, `component.set` and instance-swap values), and those the
+definitions of these use in turn; the styles and tokens its nodes refer to,
+with the tokens their values alias; and the SVG artwork, images and fonts it
+uses. Image and font `nodes` count the uses in what is kept: the screen and
+the kept component definitions. `openfig-web ir --screen` writes this.
+
+## Reading the IR
+
+### Position and transform
+
+- `x`, `y` is where the node's own top-left corner — its origin before the
+  transform — lands in the parent's box. In CSS: `left: x; top: y; width;
+  height; transform-origin: 0 0; transform: matrix(a, b, c, d, 0, 0)`. For a
+  horizontal flip (`[-1, 0, 0, 1]`) `x` is therefore the right edge of what
+  shows; for a 90° turn (`[0, 1, -1, 0]`) of a 48 × 0 line it is the line's top.
+- `rotation` is derived from `transform` for reading. Do not apply it on top of
+  `transform`, and do not use it alone with CSS's default centre origin.
+- `bounds` (only with `transform`) is the transformed box's bounding box in the
+  parent's box: where the node shows, and the box Figma's auto layout gives
+  a rotated child.
+- Transforms nest: a child's `transform` and `bounds` are in its parent's
+  untransformed box, inside whatever transform the parent has.
+- A screen root's `x`, `y` is its place on the canvas (or in its section); a
+  page drawing one screen ignores it.
+
+### Order
+
+- Children are listed bottom first: later children draw on top of earlier
+  ones, as elements later in HTML do. With `layout.reverseZ` earlier items are
+  on top instead. A `mask` node masks the siblings after it.
+- `fills` and `stroke.paints` are also bottom first. CSS `background-image`
+  lists its layers top first, so reverse them.
+
+### Auto layout
+
+- `justify` and `align` absent mean start (Figma's "top left"). CSS's default
+  `align-items` is `stretch`, so say `flex-start`.
+- `sizing` absent on an axis is fixed: use `width` or `height`. `fill` only
+  applies inside an auto-layout parent; elsewhere it is the stored size.
+- `hug` falls back to the stored size where there is nothing to hug: a node
+  with no children or no auto layout (images, shapes, artwork, emptied
+  frames), and a frame hugging across a row or column whose children all fill
+  that axis. Likewise a child that fills along the axis its parent hugs keeps
+  its stored size.
+- The IR has no marker for a repeated list. Siblings that are instances of the
+  same component (`component.id`, or `component.set` for variants), or that
+  share a layer structure, are the best sign of one.
+
+### Text
+
+- The box is the size Figma last laid it out at. A text that hugs its width
+  (`autoResize: "width"`) is as wide as its widest measured line rounded up to
+  a whole pixel (so in 98% of 10,978 such texts in the public files). Its
+  height is the sum of its line heights, but with a fractional line height
+  Figma sometimes rounds each line's height, or the total, to whole pixels;
+  no single rule was found, so take `height` as given.
+- `style.verticalAlign` places the lines in a box taller than them: absent is
+  top. It does nothing when the height hugs.
+- `style.letterSpacing`, `lineHeight`, `paragraphSpacing`, `paragraphIndent`
+  and `listSpacing` are pixels; Figma's percent letter spacing is already
+  multiplied by the font size. `lineHeightAuto` marks Figma's "Auto": the
+  font's own line height, given in pixels as Figma computes it.
+- `style.textTransform: "capitalize"` is Figma's title case; `small-caps` and
+  `all-small-caps` map to `font-variant-caps`. `leadingTrim: "cap"` is CSS's
+  `text-box: trim-both cap alphabetic`.
+- A text with no `fills` draws no glyphs (it still takes its space), except
+  runs that carry `fills` of their own. A run lists `fills` only where they
+  differ from the node's.
+- A text that uses a text style shows the style's values, also in older files
+  that name it by `inheritTextStyleID` and keep stale copies on the node.
+
+### Paints and effects
+
+- Image `fit`: `cover`, `contain`, `tile` (at `scale` of the image's pixel
+  size), and `crop`, which shows the part of the image given by
+  `crop: { x, y, width, height }` as fractions of the image. In CSS:
+  `background-size: (100 / width)% (100 / height)%` and
+  `background-position: (x / (1 − width) × 100)% (y / (1 − height) × 100)%`.
+  A crop Figma also rotates or skews keeps only its scale and offset.
+  `rotation` turns the image clockwise in degrees; `filters` are Figma's
+  exposure, contrast, saturation, temperature, tint, highlights and shadows,
+  -1..1.
+- Blurs keep Figma's radius, which is twice CSS's: `layer-blur` is
+  `filter: blur(radius / 2)` and `background-blur` is
+  `backdrop-filter: blur(radius / 2)`. Shadow `blur` goes into `box-shadow`
+  as is, and halved into a `drop-shadow()` filter. (This is the reference
+  page's conversion in openfig-web; it was not measured against Figma.)
+- `arc` angles are radians, clockwise from 3 o'clock. `end` below `start` is
+  the same arc swept the other way: it covers the angles between the two.
+  `innerRadius` is a fraction of the radius (a ring).
+- An image in `assets.images` without `mime`, `width` and `height` has no bytes
+  in the file: it is referenced but not stored.
+
+### Other fields
+
+Every field is described in `src/ir/types.ts`; these are the ones not
+covered above:
+
+| Field | Meaning |
+|---|---|
+| `visible: false` | A hidden layer a component property can show. |
+| `minWidth` … `maxHeight` | Auto layout size limits. |
+| `gridCell` | Row and column (zero-based), spans, and alignment in a grid parent. |
+| `scroll`, `scrollBehavior` | Prototype scrolling: the overflow direction; `fixed` or `sticky` in a scrolling parent. |
+| `opacity`, `blendMode` | Layer opacity; CSS `mix-blend-mode` value. Paints have their own `blendMode`. |
+| `stroke` | `paints`, `weight` (one, or per side), `align` (`inside`, `outside`, `center`), `dashes` (dash and gap lengths), `cap`, `join`. |
+| `radius`, `cornerSmoothing` | One radius or `[top-left, top-right, bottom-right, bottom-left]`; iOS-style smoothing 0..1. |
+| `effects` | `drop-shadow` and `inner-shadow` (`x`, `y`, `blur`, `spread`, `color`, `token`, `showBehindNode`: the shadow shows through translucent parts of the node), `layer-blur`, `background-blur`. |
+| `mask` | `alpha`, `vector` (by outline) or `luminance`. |
+| `layout` (flex) | Also `wrap`, `lineGap` (between wrapped lines), `alignContent`, `strokesInLayout` (borders take up space). |
+| `layout` (grid) | `rows`, `columns` as CSS track lists, `rowGap`, `columnGap`, `padding`. |
+| `text.lines` | Per line: `list` (`ordered`, `unordered`) and `indent` level. |
+| `text.maxLines`, `autoResize: "truncate"` | The text is cut with an ellipsis. |
+| `text.link`, `runs[].link` | A URL, or `#<node id>`. |
+| `propRefs` | Which component property drives `characters`, `visible` or `mainComponent`. |
+| `styles`, `tokens`, `modes` | Shared styles, bound tokens by IR field, and variable modes set on the node. |
+| `exports` | The designer's export settings: `format`, `suffix`, `scale`. |
+| `component.overrides`, `component.scale` | Layers changed on the instance; a scaled instance's factor. |
+| `components[id]` | Also `remote` (from a library), `page`, `variants`, `states`; props' `preferred` are component keys. |
+| `tokens.tokens[name]` | `collection`, `type`, `css`, `values` by mode (`{ token }` for an alias), `scopes`, `description`. |
+| `assets` | `images` (`nodes`, `width`, `height`, `mime`), `svgs` (`name`, `width`, `height`, `svg`), `fonts` (`family`, `style`, `weight`, `italic`, `nodes`). |
 
 ## How it was checked
 
@@ -118,5 +252,5 @@ about 40% of the size of the REST JSON with SVG artwork included.
 - Angular and diamond gradients are approximated in SVG artwork (as radial).
   Masks in artwork clip by the mask's outline; alpha and luminance masks
   outside artwork are only flagged (`mask`).
-- Rotated children of auto layout take their rotated bounding box in Figma;
-  CSS transforms do not affect layout.
+- Rotated children of auto layout take their rotated bounding box (`bounds`)
+  in Figma; CSS transforms do not affect layout.

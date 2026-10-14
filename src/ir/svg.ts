@@ -5,6 +5,8 @@
  */
 import type * as Rest from "@figma/rest-api-spec";
 import { hex, round } from "./paint.js";
+import { bezier, Extent, intersect, turns, type Rect } from "../rest/bounds.js";
+import { parseSVGPathData } from "../vector.js";
 
 type Matrix = [number, number, number, number, number, number];
 
@@ -34,6 +36,47 @@ function matrixAttr(m: Matrix): string {
   if (isIdentity(m)) return "";
   if (m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1) return ` transform="translate(${round(m[4], 3)} ${round(m[5], 3)})"`;
   return ` transform="matrix(${m.map((v) => round(v, 5)).join(" ")})"`;
+}
+
+function apply(m: Matrix, x: number, y: number): [number, number] {
+  return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+}
+
+/** Add the outline of path data `d`, mapped by `m`, to `ext`. */
+function addPath(ext: Extent, d: string, m: Matrix): void {
+  let cur: [number, number] = [0, 0];
+  let commands;
+  try {
+    commands = parseSVGPathData(d);
+  } catch {
+    return;
+  }
+  for (const c of commands) {
+    if (c.type === "Z") continue;
+    const end = apply(m, c.x, c.y);
+    if (c.type === "C") {
+      // A Bézier mapped by an affine transform is the Bézier of the mapped points.
+      const all = [cur, apply(m, c.c1x, c.c1y), apply(m, c.c2x, c.c2y), end];
+      for (const k of [0, 1]) {
+        for (const t of turns(all.map((q) => q[k]))) ext.add(bezier(all.map((q) => q[0]), t), bezier(all.map((q) => q[1]), t));
+      }
+    }
+    cur = end;
+    ext.add(cur[0], cur[1]);
+  }
+}
+
+/** The bounds of `r` (in a node's coordinates) mapped by `m`. */
+function mapRect(r: Rect, m: Matrix): Rect | null {
+  const ext = new Extent();
+  for (const [x, y] of [[r.x, r.y], [r.x + r.width, r.y], [r.x, r.y + r.height], [r.x + r.width, r.y + r.height]]) ext.add(...apply(m, x, y));
+  return ext.rect();
+}
+
+function addRect(ext: Extent, r: Rect | null): void {
+  if (!r) return;
+  ext.add(r.x, r.y);
+  ext.add(r.x + r.width, r.y + r.height);
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -88,11 +131,13 @@ function paintAttr(w: Writer, p: Rest.Paint, size: { x: number; y: number }): { 
   return undefined;
 }
 
-function pathEls(w: Writer, paths: Rest.Path[] | undefined, paints: Rest.Paint[], size: { x: number; y: number }, overrides?: Record<string, any>): string {
+/** The painted paths; their outlines, mapped by `m`, are added to `ext`. */
+function pathEls(w: Writer, paths: Rest.Path[] | undefined, paints: Rest.Paint[], size: { x: number; y: number }, m: Matrix, ext: Extent, overrides?: Record<string, any>): string {
   let out = "";
   for (const path of paths ?? []) {
     const own = path.overrideID !== undefined ? overrides?.[String(path.overrideID)]?.fills : undefined;
     const list: Rest.Paint[] = own ?? paints;
+    const before = out;
     for (const p of list) {
       const a = paintAttr(w, p, size);
       if (!a) continue;
@@ -102,48 +147,68 @@ function pathEls(w: Writer, paths: Rest.Path[] | undefined, paints: Rest.Paint[]
       const style = blend ? ` style="mix-blend-mode:${blend}"` : "";
       out += `<path d="${esc(path.path)}"${rule} fill="${a.fill}"${op}${style}/>`;
     }
+    if (out !== before) addPath(ext, path.path, m);
   }
   return out;
 }
 
 const CONTAINERS = new Set(["FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
 
-/** The node's content in its own coordinates. */
-function body(w: Writer, n: any): string {
+/**
+ * The node's content in its own coordinates. `m` maps them to the artwork's,
+ * where the bounds of what is painted are added to `ext`.
+ */
+function body(w: Writer, n: any, m: Matrix, ext: Extent): string {
   const size = n.size ?? { x: 0, y: 0 };
-  let out = pathEls(w, n.fillGeometry, n.fills ?? [], size, n.fillOverrideTable);
-  if (n.type === "BOOLEAN_OPERATION") return out + pathEls(w, n.strokeGeometry, n.strokes ?? [], size);
+  let out = pathEls(w, n.fillGeometry, n.fills ?? [], size, m, ext, n.fillOverrideTable);
+  if (n.type === "BOOLEAN_OPERATION") return out + pathEls(w, n.strokeGeometry, n.strokes ?? [], size, m, ext);
   let kids = "";
+  const kidsExt = new Extent();
   let clip: string | undefined;
   let clipped = "";
+  let clipExt = new Extent();
+  let clipArea: Rect | null = null;
+  const endClip = () => {
+    if (!clip) return;
+    kids += `<g clip-path="url(#${clip})">${clipped}</g>`;
+    addRect(kidsExt, intersect(clipExt.rect(), clipArea));
+  };
   for (const c of n.children ?? []) {
     if (c.visible === false) continue;
     if (c.isMask) {
       // A mask clips the siblings above it, up to the next mask.
-      if (clip) kids += `<g clip-path="url(#${clip})">${clipped}</g>`;
+      endClip();
       clipped = "";
+      clipExt = new Extent();
       clip = w.id("m");
-      const paths = (c.fillGeometry ?? []).map((p: Rest.Path) => `<path d="${esc(p.path)}"${p.windingRule === "EVENODD" ? ` clip-rule="evenodd"` : ""}${matrixAttr(relative(c))}/>`).join("");
+      const area = new Extent();
+      const paths = (c.fillGeometry ?? []).map((p: Rest.Path) => {
+        addPath(area, p.path, multiply(m, relative(c)));
+        return `<path d="${esc(p.path)}"${p.windingRule === "EVENODD" ? ` clip-rule="evenodd"` : ""}${matrixAttr(relative(c))}/>`;
+      }).join("");
+      clipArea = area.rect();
       w.defs.push(`<clipPath id="${clip}">${paths}</clipPath>`);
       continue;
     }
-    const el = node(w, c);
-    if (clip) clipped += el;
-    else kids += el;
+    if (clip) clipped += node(w, c, m, clipExt);
+    else kids += node(w, c, m, kidsExt);
   }
-  if (clip) kids += `<g clip-path="url(#${clip})">${clipped}</g>`;
+  endClip();
+  let kidsArea = kidsExt.rect();
   if (kids && CONTAINERS.has(n.type) && n.clipsContent) {
     const id = w.id("c");
     w.defs.push(`<clipPath id="${id}"><rect width="${round(size.x, 3)}" height="${round(size.y, 3)}"/></clipPath>`);
     kids = `<g clip-path="url(#${id})">${kids}</g>`;
+    kidsArea = intersect(kidsArea, mapRect({ x: 0, y: 0, width: size.x, height: size.y }, m));
   }
+  addRect(ext, kidsArea);
   out += kids;
-  out += pathEls(w, n.strokeGeometry, n.strokes ?? [], size);
+  out += pathEls(w, n.strokeGeometry, n.strokes ?? [], size, m, ext);
   return out;
 }
 
-function node(w: Writer, n: any): string {
-  const inner = body(w, n);
+function node(w: Writer, n: any, m: Matrix, ext: Extent): string {
+  const inner = body(w, n, multiply(m, relative(n)), ext);
   if (!inner) return "";
   const attrs = [matrixAttr(relative(n))];
   if (n.opacity !== undefined && n.opacity < 1) attrs.push(` opacity="${round(n.opacity, 3)}"`);
@@ -161,17 +226,28 @@ export function hasGeometry(n: any): boolean {
 }
 
 /**
- * The SVG document for a REST node: `viewBox` is the node's box, and strokes
- * that reach outside it stay visible. The node's own opacity and blend mode
- * are left to the element that shows it. `idPrefix` keeps gradient and clip ids
- * unique when several are inlined in one page.
+ * The SVG document for a REST node, in the node's coordinates: `viewBox` is
+ * the node's box, grown to take in what is painted outside it (a stroke, an
+ * arrowhead, a line of no height), so the artwork shows whole as an image too;
+ * its origin is then left of or above the node's. The node's own opacity and
+ * blend mode are left to the element that shows it. `idPrefix` keeps gradient
+ * and clip ids unique when several are inlined in one page.
  */
 export function nodeSvg(n: any, idPrefix = "s"): string {
   const w = new Writer(idPrefix.replace(/[^A-Za-z0-9_-]/g, "_"));
   const size = n.size ?? { x: 0, y: 0 };
-  const inner = body(w, n);
-  const W = round(size.x, 3);
-  const H = round(size.y, 3);
+  const ext = new Extent();
+  const inner = body(w, n, IDENTITY, ext);
+  // Grown, outward to a thousandth, where paint reaches past the box by more than rounding.
+  const out = ext.rect();
+  const lo = (v: number) => (v < -0.01 ? Math.floor(v * 1000) / 1000 : 0);
+  const hi = (v: number, box: number) => (v > box + 0.01 ? Math.ceil(v * 1000) / 1000 : round(box, 3));
+  const x0 = out ? lo(out.x) : 0;
+  const y0 = out ? lo(out.y) : 0;
+  const x1 = out ? hi(out.x + out.width, size.x) : round(size.x, 3);
+  const y1 = out ? hi(out.y + out.height, size.y) : round(size.y, 3);
+  const W = round(x1 - x0, 3);
+  const H = round(y1 - y0, 3);
   const defs = w.defs.length ? `<defs>${w.defs.join("")}</defs>` : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" overflow="visible">${defs}${inner}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${round(x0, 3)} ${round(y0, 3)} ${W} ${H}" fill="none" overflow="visible">${defs}${inner}</svg>`;
 }

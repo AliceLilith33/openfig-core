@@ -33,8 +33,19 @@ const STYLE_FIELDS = [
 /** Looks up the style node a `styleIdFor*` reference names. */
 export type StyleLookup = (ref: any) => FigNode | undefined;
 
+/**
+ * The text style a node or override uses: `styleIdForText`, or in older files
+ * the `inheritTextStyleID` it replaced. Figma lays such text out with the
+ * style's values even when the copies on the node are stale.
+ */
+export function textStyleRef(src: any): any {
+  if (src?.styleIdForText) return src.styleIdForText;
+  return src?.inheritTextStyleID ? { guid: src.inheritTextStyleID } : undefined;
+}
+
 function withTextStyle(src: any, lookup: StyleLookup | undefined): any {
-  const style: any = src?.styleIdForText ? lookup?.(src.styleIdForText) : undefined;
+  const ref = textStyleRef(src);
+  const style: any = ref ? lookup?.(ref) : undefined;
   if (!style) return src;
   const out = { ...src };
   for (const k of STYLE_FIELDS) if (style[k] !== undefined) out[k] = style[k];

@@ -31,7 +31,7 @@ export {
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export { toRestDocument } from "./rest/index.js";
 export { toRestVariables } from "./rest/variables.js";
-export { toDesignIR, designFromFig, nodeSvg } from "./ir/index.js";
+export { toDesignIR, designFromFig, nodeSvg, screenIR } from "./ir/index.js";
 export {
   appendVectorPayloadToDocument,
   encodeCommandsBlob,

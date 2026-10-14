@@ -97,6 +97,20 @@ describe("toRestDocument", () => {
     expect(Object.keys(file.styles).sort()).toEqual(["1:50", "1:51"]);
   });
 
+  it("reads the text style of older files from inheritTextStyleID", () => {
+    // Figma lays the text out at the style's 16px; the node still caches 35px.
+    const doc = docOf([
+      { id: 51, parent: 100, type: "TEXT", styleType: "TEXT", name: "Base", fontSize: 16, lineHeight: { value: 1.6, units: "RAW" }, fontName: { family: "Open Sans", style: "Regular", postscript: "" } } as any,
+      {
+        id: 1, parent: 100, type: "TEXT", textData: { characters: "x" }, fontSize: 35, lineHeight: { value: 100, units: "PERCENT" },
+        fontName: { family: "Open Sans", style: "Regular", postscript: "" }, inheritTextStyleID: G(51),
+      } as any,
+    ]);
+    const text = index(toRestDocument(doc).document).get("1:1");
+    expect(text.style).toMatchObject({ fontSize: 16, lineHeightPx: 25.6, lineHeightUnit: "FONT_SIZE_%" });
+    expect(text.styles).toEqual({ text: "1:51" });
+  });
+
   it("expands instances with REST's sublayer ids and lists overrides per instance", () => {
     // Card (symbol 10): title TEXT (key K1) and a nested Badge instance (key K2)
     // of symbol 20, whose label TEXT has key K3.

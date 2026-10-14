@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { parseFig, toDesignIR, toRestDocument, toRestVariables } from "../index.js";
+import { parseFig, screenIR, toDesignIR, toRestDocument, toRestVariables } from "../index.js";
 import type { DesignIR, IRNode, RestFile, RestVariables } from "../index.js";
 
 const IDENTITY = [[1, 0, 0], [0, 1, 0]];
@@ -79,6 +79,9 @@ describe("toDesignIR", () => {
     expect(n.get("1:1")!.transform!.map((v) => Math.round(v * 1000) / 1000)).toEqual([0.866, 0.5, -0.5, 0.866]);
     expect(n.get("1:2")).toMatchObject({ transform: [-1, 0, 0, 1] });
     expect(n.get("1:2")).not.toHaveProperty("rotation");
+    // Where each shows: the transformed box's bounds in the parent.
+    expect(n.get("1:1")!.bounds).toEqual({ x: -5, y: 20, width: 58.301, height: 50.981 });
+    expect(n.get("1:2")!.bounds).toEqual({ x: 0, y: 0, width: 100, height: 100 });
   });
 
   it("turns gradients into CSS for the node's box", () => {
@@ -320,6 +323,45 @@ describe("toDesignIR", () => {
     expect(n.get("1:1")!.type).toBe("frame");
   });
 
+  it("grows SVG artwork to take in paint outside the node's box", () => {
+    const ir = toDesignIR(file([
+      node("1:1", "FRAME", { children: [
+        // A line of no height with an arrowhead past its end.
+        node("1:2", "VECTOR", {
+          name: "Arrow", size: { x: 20, y: 0 }, strokes: [solid(0, 0, 0)], fillGeometry: [],
+          strokeGeometry: [{ path: "M22 0L15 -7L15 7Z M0 1L20 1L20 -1L0 -1Z", windingRule: "NONZERO" }],
+        }),
+        // A curve bulging past the box between its end points.
+        node("1:3", "VECTOR", {
+          name: "Bump", size: { x: 10, y: 10 }, fills: [solid(0, 0, 0)], strokeGeometry: [],
+          fillGeometry: [{ path: "M0 10C0 -10 10 -10 10 10Z", windingRule: "NONZERO" }],
+        }),
+        node("1:4", "VECTOR", {
+          name: "Square", size: { x: 10, y: 10 }, fills: [solid(0, 0, 0)], strokeGeometry: [],
+          fillGeometry: [{ path: "M0 0L10 0L10 10L0 10Z", windingRule: "NONZERO" }],
+        }),
+      ] }),
+    ]));
+    expect(ir.assets.svgs.arrow.svg).toMatch(/^<svg [^>]*width="22" height="14" viewBox="0 -7 22 14"/);
+    expect(ir.assets.svgs.arrow).toMatchObject({ width: 20, height: 0 });
+    expect(ir.assets.svgs.bump.svg).toMatch(/viewBox="0 -5 10 15"/);
+    expect(ir.assets.svgs.square.svg).toMatch(/width="10" height="10" viewBox="0 0 10 10"/);
+  });
+
+  it("keeps a shape filled with an image out of SVG artwork", () => {
+    const ir = toDesignIR(file([
+      node("1:1", "FRAME", { children: [
+        node("1:2", "VECTOR", {
+          fills: [{ type: "IMAGE", blendMode: "NORMAL", scaleMode: "FILL", imageRef: "abc" }],
+          fillGeometry: [{ path: "M0 0L100 0L100 100L0 100Z", windingRule: "NONZERO" }], strokeGeometry: [],
+        }),
+      ] }),
+    ]));
+    expect(index(ir).get("1:2")).toMatchObject({ type: "vector", fills: [{ type: "image", image: "abc" }] });
+    expect(index(ir).get("1:2")).not.toHaveProperty("asset");
+    expect(ir.assets.svgs).toEqual({});
+  });
+
   it("drops hidden layers unless a property can show them, and recognises images", () => {
     const png = new Uint8Array(24);
     png.set([0x89, 0x50, 0x4e, 0x47], 0);
@@ -336,6 +378,53 @@ describe("toDesignIR", () => {
     expect(n.get("1:3")).toMatchObject({ visible: false, propRefs: { visible: "Show" } });
     expect(n.get("1:4")).toMatchObject({ type: "image", fills: [{ type: "image", image: "abc", fit: "cover" }] });
     expect(ir.assets.images).toEqual({ abc: { nodes: 1, mime: "image/png", width: 512, height: 256 } });
+  });
+
+  it("cuts the IR down to one screen and what it uses", () => {
+    const collection = { id: "VariableCollectionId:1:1", name: "Theme", key: "", modes: [{ modeId: "1:0", name: "Light" }], defaultModeId: "1:0", remote: false, hiddenFromPublishing: false, variableIds: [] };
+    const variable = (id: string, name: string, value: unknown) => ({
+      id, name, key: "", variableCollectionId: collection.id, resolvedType: "COLOR", valuesByMode: { "1:0": value },
+      remote: false, description: "", hiddenFromPublishing: false, scopes: ["ALL_SCOPES"], codeSyntax: {},
+    });
+    const meta = {
+      variableCollections: { [collection.id]: collection, "VariableCollectionId:1:2": { ...collection, id: "VariableCollectionId:1:2", name: "Other" } },
+      variables: {
+        "VariableID:9:1": variable("VariableID:9:1", "bg", { type: "VARIABLE_ALIAS", id: "VariableID:9:2" }),
+        "VariableID:9:2": variable("VariableID:9:2", "white", { r: 1, g: 1, b: 1, a: 1 }),
+        "VariableID:9:3": variable("VariableID:9:3", "unused", { r: 0, g: 0, b: 0, a: 1 }),
+      },
+    } as unknown as RestVariables["meta"];
+    const image = (ref: string) => ({ type: "IMAGE", blendMode: "NORMAL", scaleMode: "FILL", imageRef: ref });
+    const text = (id: string, family: string) => node(id, "TEXT", { characters: "x", style: { fontFamily: family, fontStyle: "Regular", fontWeight: 400, fontSize: 12, lineHeightPx: 14 } });
+    const ir = toDesignIR(file([
+      node("2:1", "COMPONENT", { name: "Button", children: [text("2:2", "Inter")] }),
+      node("2:5", "COMPONENT", { name: "Badge" }),
+      node("1:1", "FRAME", { children: [
+        node("1:2", "INSTANCE", { componentId: "2:1", children: [text("I1:2;2:2", "Inter")] }),
+        node("1:3", "RECTANGLE", { fills: [image("abc")], styles: { fill: "5:1" } }),
+        node("1:4", "RECTANGLE", { fills: [image("abc"), solid(1, 1, 1, { boundVariables: { color: { type: "VARIABLE_ALIAS", id: "VariableID:9:1" } } })] }),
+      ] }),
+      node("1:9", "FRAME", { children: [
+        node("1:10", "INSTANCE", { componentId: "2:5" }),
+        node("1:11", "RECTANGLE", { fills: [image("abc"), image("def")], styles: { fill: "5:2" } }),
+        text("1:12", "Roboto"),
+      ] }),
+    ], { styles: { "5:1": { key: "", name: "Photo", styleType: "FILL", description: "" }, "5:2": { key: "", name: "Other", styleType: "FILL", description: "" } } as any }),
+    { variables: meta });
+    expect(ir.assets.images.abc.nodes).toBe(3);
+    const one = screenIR(ir, "1:1");
+    expect(one.pages[0].screens.map((s) => s.id)).toEqual(["1:1"]);
+    expect(Object.keys(one.components)).toEqual(["2:1"]);
+    expect(Object.keys(one.styles)).toEqual(["5:1"]);
+    // The token used, and the one it aliases; only their collection.
+    expect(Object.keys(one.tokens.tokens).sort()).toEqual(["bg", "white"]);
+    expect(one.tokens.collections.map((c) => c.name)).toEqual(["Theme"]);
+    // Counted in the screen and the Button definition: one Inter text each.
+    expect(one.assets.images).toEqual({ abc: { nodes: 2 } });
+    expect(one.assets.fonts).toEqual([{ family: "Inter", style: "Regular", weight: 400, nodes: 2 }]);
+    // The whole IR is left as it was.
+    expect(Object.keys(ir.components).sort()).toEqual(["2:1", "2:5"]);
+    expect(index(one).get("1:3")).not.toHaveProperty("bounds");
   });
 
   it("can leave out the layers of plain instances", () => {

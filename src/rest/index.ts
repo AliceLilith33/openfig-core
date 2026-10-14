@@ -17,7 +17,7 @@ import { findVariableSet, resolveVariableData } from "../variables.js";
 import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
 import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
 import { interactions } from "./interactions.js";
-import { textBinding, textFields } from "./text.js";
+import { textBinding, textFields, textStyleRef } from "./text.js";
 import { collectionIdOfRef, restCollectionId } from "./variables.js";
 
 export interface ToRestOptions {
@@ -335,7 +335,7 @@ function styles(ctx: Ctx, n: any, type: string): Record<string, string> | undefi
   const set = (k: string, ref: any) => { const id = styleId(ctx, ref); if (id) out[k] = id; };
   set("fill", n.styleIdForFill);
   set("stroke", n.styleIdForStrokeFill);
-  set("text", n.styleIdForText);
+  set("text", textStyleRef(n));
   set("effect", n.styleIdForEffect);
   set("grid", n.styleIdForGrid);
   // Frames list fill and stroke styles under both names.
@@ -754,7 +754,7 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
 
   const refs = propertyReferences(ctx, n, scope.propOwner);
   if (refs) out.componentPropertyReferences = refs;
-  const bound = boundVariables(n, type === "TEXT" ? styleNode(ctx, n.styleIdForText) : undefined);
+  const bound = boundVariables(n, type === "TEXT" ? styleNode(ctx, textStyleRef(n)) : undefined);
   if (bound) out.boundVariables = bound;
   const explicit = explicitVariableModes(ctx, n);
   if (explicit) out.explicitVariableModes = explicit;

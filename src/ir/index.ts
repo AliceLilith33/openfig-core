@@ -17,6 +17,7 @@ import type {
 
 export type * from "./types.js";
 export { nodeSvg } from "./svg.js";
+export { screenIR } from "./screen.js";
 
 export interface ToDesignIROptions {
   /** The file's variables, from `toRestVariables` or `GET /v1/files/:key/variables/local`. */
@@ -416,6 +417,17 @@ function placement(n: any, out: IRNode): void {
     // A flip has no single rotation; the transform says it all.
     const r = a * d - b * c > 0 ? round((Math.atan2(b, a) * 180) / Math.PI, 2) : 0;
     if (r) out.rotation = r;
+    // The box after the transform, in the parent's box.
+    const w = n.size?.x ?? 0;
+    const h = n.size?.y ?? 0;
+    const xs = [0, a * w, c * h, a * w + c * h];
+    const ys = [0, b * w, d * h, b * w + d * h];
+    const x0 = Math.min(...xs);
+    const y0 = Math.min(...ys);
+    out.bounds = {
+      x: round(t[0][2] + x0, 3), y: round(t[1][2] + y0, 3),
+      width: round(Math.max(...xs) - x0, 3), height: round(Math.max(...ys) - y0, 3),
+    };
   }
 }
 
@@ -653,7 +665,8 @@ function svgAsset(ctx: Ctx, n: any): string | undefined {
 }
 
 function wantsSvg(ctx: Ctx, n: any, top: boolean): boolean {
-  if (VECTOR_TYPES.has(n.type)) return true;
+  // Artwork draws no images: a shape filled with one stays a node.
+  if (VECTOR_TYPES.has(n.type)) return !hasImage(n.fills) && !hasImage(n.strokes);
   if (!CONTAINER_TYPES.has(n.type)) return false;
   if (n.exportSettings?.some((e: any) => e.format === "SVG") && vectorArt(n)) return true;
   if (!vectorArt(n)) return false;
