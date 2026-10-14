@@ -8,6 +8,7 @@ import {
   encodeVectorNetworkBlob,
   geometryBlobToSVGPath,
   getBlobBytes,
+  parseCommandsBlob,
   parseFig,
   parseSVGPathData,
   parseVectorNetworkBlob,
@@ -503,5 +504,75 @@ describe("encodeVectorNetwork", () => {
     for (let i = 0; i < ns; i++) {
       expect(view.getUint32(12 + nv * 12 + i * 28, true), `segment ${i} word0`).toBe(0);
     }
+  });
+});
+
+describe("parseCommandsBlob", () => {
+  const blob = (...parts: Array<[number, ...number[]]>): Uint8Array => {
+    const size = parts.reduce((sum, [, ...coords]) => sum + 1 + coords.length * 4, 0);
+    const bytes = new Uint8Array(size);
+    const view = new DataView(bytes.buffer);
+    let offset = 0;
+    for (const [op, ...coords] of parts) {
+      bytes[offset++] = op;
+      for (const c of coords) { view.setFloat32(offset, c, true); offset += 4; }
+    }
+    return bytes;
+  };
+
+  it("keeps coordinates exact by default", () => {
+    // 0.123 and 10.005 both lose information at two decimal places.
+    const bytes = blob([1, 0.123, 10.005], [2, 1 / 3, 2], [0]);
+    const path = geometryBlobToSVGPath(bytes);
+    expect(path).toBe("M0.123 10.005L0.33333334 2Z");
+
+    // Every number in the output reads back to the float32 that was stored.
+    const reparsed = encodeCommandsBlob(parseSVGPathData(path));
+    expect(reparsed).toEqual(bytes);
+  });
+
+  it("rounds when given a precision", () => {
+    const bytes = blob([1, 0.123, 10.005], [2, 1 / 3, 2], [0]);
+    expect(geometryBlobToSVGPath(bytes, { precision: 2 })).toBe("M0.12 10.01L0.33 2Z");
+  });
+
+  it("throws on an unknown opcode, naming its offset", () => {
+    const bytes = blob([1, 0, 0], [3, 1, 1, 2, 2], [0]);
+    expect(() => parseCommandsBlob(bytes)).toThrow(/unknown opcode 3 at offset 9/);
+    expect(() => geometryBlobToSVGPath(bytes)).toThrow(/unknown opcode 3/);
+  });
+
+  it("throws on a command cut short by the end of the blob", () => {
+    const bytes = blob([1, 0, 0], [4, 1, 1, 2, 2, 3, 3]).subarray(0, 30);
+    expect(() => parseCommandsBlob(bytes)).toThrow(/opcode 4 at offset 9 needs 24 bytes but only 20 remain/);
+  });
+
+  it("returns the commands decoded so far when not strict", () => {
+    const bytes = blob([1, 5, 6], [7], [0]);
+    expect(parseCommandsBlob(bytes, { strict: false })).toEqual([{ type: "M", x: 5, y: 6 }]);
+    expect(geometryBlobToSVGPath(bytes, { strict: false })).toBe("M5 6");
+  });
+
+  it("decodes every reference commandsBlob and re-encodes it byte-identically", () => {
+    let blobCount = 0;
+    for (const file of collectReferenceFigs()) {
+      const doc = parseFig(new Uint8Array(readFileSync(file)));
+      for (const node of doc.nodes) {
+        const geometry: { commandsBlob?: number | null }[] = [
+          ...(node.fillGeometry ?? []),
+          ...(node.strokeGeometry ?? []),
+        ];
+        for (const { commandsBlob } of geometry) {
+          if (commandsBlob == null) continue;
+          const bytes = getBlobBytes(doc, commandsBlob)!;
+          const where = `${file} node ${node.name} blob ${commandsBlob}`;
+          expect(encodeCommandsBlob(parseCommandsBlob(bytes)), where).toEqual(bytes);
+          // The SVG string carries the same information as the commands.
+          expect(encodeCommandsBlob(parseSVGPathData(geometryBlobToSVGPath(bytes))), where).toEqual(bytes);
+          blobCount++;
+        }
+      }
+    }
+    expect(blobCount).toBeGreaterThan(50);
   });
 });

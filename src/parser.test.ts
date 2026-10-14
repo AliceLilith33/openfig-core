@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { parseFig, parseFigBinary, nodeId, createEmptyFigDoc, encodeFigParts, assembleCanvasFig } from "./index.js";
-import { deflateSync } from "fflate";
+import { parseFig, parseFigBinary, nodeId, createEmptyFigDoc, encodeFigParts, assembleCanvasFig, liveChildren } from "./index.js";
+import { deflateSync, unzipSync } from "fflate";
 
 const fixturesDir = join(__dirname, "..", "test-fixtures");
 
@@ -124,5 +124,43 @@ describe("childrenMap ordering", () => {
       .filter((n) => n.guid.sessionID === 77)
       .map((n) => n.name);
     expect(names).toEqual(["pos !", "pos A", "pos _", "pos ~"]);
+  });
+});
+
+describe("parseFig input forms", () => {
+  it("accepts a bare canvas binary as well as a ZIP archive", () => {
+    const zip = new Uint8Array(readFileSync(join(fixturesDir, "circle.fig")));
+    const entries = unzipSync(zip);
+    const canvas = entries[Object.keys(entries).find((k) => k.endsWith("canvas.fig"))!];
+
+    const fromZip = parseFig(zip);
+    const fromCanvas = parseFig(canvas);
+
+    expect(fromCanvas.header).toEqual(fromZip.header);
+    expect(fromCanvas.nodes.map(nodeId)).toEqual(fromZip.nodes.map(nodeId));
+    expect(fromCanvas.images.size).toBe(0);
+    expect(fromCanvas.meta).toBeUndefined();
+  });
+
+  it("names both accepted forms when the input is neither", () => {
+    expect(() => parseFig(new Uint8Array([0x3c, 0x73, 0x76, 0x67]))).toThrow(/"PK".*"fig-".*3c 73 76 67/);
+    expect(() => parseFig(new Uint8Array(0))).toThrow(/no bytes/);
+  });
+});
+
+describe("liveChildren", () => {
+  it("drops REMOVED children and keeps layer order", () => {
+    const doc = parseFig(new Uint8Array(readFileSync(join(fixturesDir, "circle.fig"))));
+    // Figma keeps deleted nodes in the file with phase REMOVED; mark one so the
+    // fixture has something to drop.
+    const [parentId, children] = [...doc.childrenMap].find(([, c]) => c.length > 0)!;
+    const victim = children[0];
+    victim.phase = "REMOVED";
+
+    const live = liveChildren(doc, parentId);
+    expect(live).not.toContain(victim);
+    expect(live).toEqual(children.slice(1));
+    expect(doc.childrenMap.get(parentId)).toContain(victim);
+    expect(liveChildren(doc, "no-such-node")).toEqual([]);
   });
 });

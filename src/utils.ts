@@ -1,4 +1,4 @@
-import type { FigNode } from "./types.js";
+import type { FigDocument, FigNode } from "./types.js";
 
 /**
  * Returns the string ID for a node ("sessionID:localID"), or null if no guid.
@@ -24,6 +24,16 @@ export function comparePosition(a: string | undefined, b: string | undefined): n
 /** Sort sibling nodes into layer order (back to front). Stable for equal positions. */
 export function sortByPosition<T extends FigNode>(nodes: T[]): T[] {
   return nodes.sort((a, b) => comparePosition(a.parentIndex?.position, b.parentIndex?.position));
+}
+
+/**
+ * The children of `id` in layer order, without nodes whose `phase` is
+ * `REMOVED`. Figma keeps deleted nodes in the file, so `childrenMap` lists
+ * them too — this is the list a renderer or traversal usually wants.
+ * Returns a new array; `childrenMap` is left as parsed.
+ */
+export function liveChildren(doc: FigDocument, id: string): FigNode[] {
+  return (doc.childrenMap.get(id) ?? []).filter((child) => child.phase !== "REMOVED");
 }
 
 const POSITION_FIRST = 0x21; // '!'

@@ -42,7 +42,7 @@ const doc = parseFig(data);
 
 ### `parseFig(data: Uint8Array): FigDocument`
 
-Parse a complete `.fig` ZIP archive. Extracts `canvas.fig`, `meta.json`, `thumbnail.png`, and `images/*`.
+Parse a `.fig`, `.deck` or `.jam` file. Accepts a ZIP archive — extracting `canvas.fig`, `meta.json`, `thumbnail.png`, and `images/*` — or a bare canvas binary that starts with a `fig-` prelude, which has no meta, thumbnail or images.
 
 ### `parseFigBinary(data: Uint8Array): FigDocument`
 
@@ -52,6 +52,10 @@ Parse raw `canvas.fig` binary data (the blob inside the ZIP). Use this if you ex
 
 Format a node's GUID as `"sessionID:localID"` (e.g. `"1:127"`). Returns `null` if the node has no GUID.
 
+### `liveChildren(doc: FigDocument, id: string): FigNode[]`
+
+The children of a node in layer order, without the ones whose `phase` is `REMOVED`. Figma keeps deleted nodes in the file, and `childrenMap` lists them.
+
 ### `FigDocument`
 
 ```ts
@@ -59,7 +63,7 @@ interface FigDocument {
   header: { prelude: string; version: number };
   nodes: FigNode[];                      // all nodes (flat array)
   nodeMap: Map<string, FigNode>;         // id → node
-  childrenMap: Map<string, FigNode[]>;   // parent id → children
+  childrenMap: Map<string, FigNode[]>;   // parent id → children, in layer order, REMOVED included
   schema: any;                           // decoded kiwi binary schema
   compiledSchema: any;                   // compiled schema (encodeMessage/decodeMessage)
   rawChunks: Uint8Array[];               // raw length-prefixed binary chunks

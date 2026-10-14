@@ -16,10 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`convertDeckToFig` matched symbol overrides by `guid`.** Override paths address nodes by `overrideKey`, which differs from the guid on every overrideable node in the reference decks, so overrides on real files were not applied. Multi-segment paths are now resolved through each nested instance instead of by their last segment alone.
 - **`convertDeckToFig` left nested instances pointing at symbols it does not carry over.** Every instance is now baked: detached into a `FRAME`, with its symbol's children expanded under it and its overrides applied (outer overrides win; `overriddenSymbolID` swaps are honoured; cyclic symbols stop expanding). Every slide-level instance is baked, not only the first, and children of a slide are re-positioned so flattened instance content keeps its place among the slide's other children.
 - **`convertDeckToFig` copied variables without their parent.** Figma keeps `VARIABLE` and `VARIABLE_SET` nodes on the document's internal-only canvas, which the conversion did not carry over, leaving every variable pointing at a missing node. The internal-only canvas is now kept with its GUID; one is created when the source has none, and a variable whose parent is not carried over is moved onto it.
+- **`geometryBlobToSVGPath` discarded precision.** Rounding to two decimal places changed 92% of the coordinates in the reference corpus (1.03M of 1.12M). Output is now exact by default: `encodeCommandsBlob(parseSVGPathData(path))` reproduces every reference blob byte for byte.
+- **`geometryBlobToSVGPath` silently truncated** at an unknown opcode or a short final command, returning part of the shape as if it were all of it.
+- **`parseFig` rejected a bare canvas binary.** Input starting with a `fig-` prelude is now parsed directly; only ZIP archives were accepted before.
 
 ### Added
 
 - `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
+- `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
+- `liveChildren(doc, id)` — a node's children in layer order, without `REMOVED` nodes.
+
+### Changed
+
+- `geometryBlobToSVGPath(blob, { precision, strict })` writes exact coordinates unless given a `precision`; pass `precision: 2` for the previous output. It now throws on an unknown opcode or truncated command, naming the byte offset; pass `strict: false` to get the decoded prefix instead. `resolveVectorNodePaths`, which calls it, throws in the same cases. No reference blob triggers either.
 
 ### Known limitations
 

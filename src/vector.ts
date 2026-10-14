@@ -117,60 +117,117 @@ export function getBlobBytes(doc: FigDocument, blobIndex: number | null | undefi
   return null;
 }
 
-export function geometryBlobToSVGPath(blob: Uint8Array): string {
-  if (!blob.length) return "";
+export interface ParseCommandsBlobOptions {
+  /**
+   * Throw on an unknown opcode or a command cut short by the end of the blob
+   * (the default). With `false`, decoding stops there and returns the commands
+   * read so far — which silently drops the rest of the shape.
+   */
+  strict?: boolean;
+}
 
+export interface GeometryBlobToSVGPathOptions extends ParseCommandsBlobOptions {
+  /**
+   * Round coordinates to this many decimal places. Omit it to keep every
+   * coordinate exact: each float32 is written in the shortest form that reads
+   * back to the same float32.
+   */
+  precision?: number;
+}
+
+/**
+ * Decode a geometry `commandsBlob` (the pre-flattened path behind
+ * `fillGeometry` / `strokeGeometry`) into path commands.
+ *
+ * Each command is a one-byte opcode followed by little-endian float32
+ * coordinates: 0 close, 1 move (x, y), 2 line (x, y), 4 cubic (c1, c2, end).
+ * Opcode 3 does not occur in any reference file and is not decoded.
+ */
+export function parseCommandsBlob(
+  blob: Uint8Array,
+  { strict = true }: ParseCommandsBlobOptions = {},
+): VectorPathCommand[] {
   const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+  const commands: VectorPathCommand[] = [];
   let offset = 0;
-  const parts: string[] = [];
 
-  const canRead = (byteLength: number) => offset + byteLength <= blob.length;
+  const fail = (message: string): VectorPathCommand[] => {
+    if (strict) throw new Error(`commandsBlob: ${message}`);
+    return commands;
+  };
+  const f32 = (at: number) => view.getFloat32(at, true);
 
   while (offset < blob.length) {
+    const at = offset;
     const cmd = blob[offset++];
+    const size = cmd === CMD_CUBIC_TO ? 24 : cmd === CMD_MOVE_TO || cmd === CMD_LINE_TO ? 8 : 0;
+    if (cmd !== CMD_CLOSE && size === 0) {
+      return fail(`unknown opcode ${cmd} at offset ${at}`);
+    }
+    if (offset + size > blob.length) {
+      return fail(
+        `opcode ${cmd} at offset ${at} needs ${size} bytes but only ${blob.length - offset} remain`,
+      );
+    }
 
     switch (cmd) {
       case CMD_CLOSE:
-        parts.push("Z");
+        commands.push({ type: "Z" });
         break;
-
-      case CMD_MOVE_TO: {
-        if (!canRead(8)) return parts.join("");
-        const x = roundPathNumber(view.getFloat32(offset, true));
-        const y = roundPathNumber(view.getFloat32(offset + 4, true));
-        offset += 8;
-        parts.push(`M${x} ${y}`);
+      case CMD_MOVE_TO:
+        commands.push({ type: "M", x: f32(offset), y: f32(offset + 4) });
         break;
-      }
-
-      case CMD_LINE_TO: {
-        if (!canRead(8)) return parts.join("");
-        const x = roundPathNumber(view.getFloat32(offset, true));
-        const y = roundPathNumber(view.getFloat32(offset + 4, true));
-        offset += 8;
-        parts.push(`L${x} ${y}`);
+      case CMD_LINE_TO:
+        commands.push({ type: "L", x: f32(offset), y: f32(offset + 4) });
         break;
-      }
-
-      case CMD_CUBIC_TO: {
-        if (!canRead(24)) return parts.join("");
-        const x1 = roundPathNumber(view.getFloat32(offset, true));
-        const y1 = roundPathNumber(view.getFloat32(offset + 4, true));
-        const x2 = roundPathNumber(view.getFloat32(offset + 8, true));
-        const y2 = roundPathNumber(view.getFloat32(offset + 12, true));
-        const x = roundPathNumber(view.getFloat32(offset + 16, true));
-        const y = roundPathNumber(view.getFloat32(offset + 20, true));
-        offset += 24;
-        parts.push(`C${x1} ${y1} ${x2} ${y2} ${x} ${y}`);
+      case CMD_CUBIC_TO:
+        commands.push({
+          type: "C",
+          c1x: f32(offset),
+          c1y: f32(offset + 4),
+          c2x: f32(offset + 8),
+          c2y: f32(offset + 12),
+          x: f32(offset + 16),
+          y: f32(offset + 20),
+        });
         break;
-      }
-
-      default:
-        return parts.join("");
     }
+    offset += size;
   }
 
-  return parts.join("");
+  return commands;
+}
+
+/** Shortest decimal string that reads back to the same float32. */
+function formatFloat32(n: number): string {
+  for (let digits = 1; digits < 9; digits++) {
+    const candidate = Number(n.toPrecision(digits));
+    if (Math.fround(candidate) === n) return String(candidate);
+  }
+  return String(n);
+}
+
+export function geometryBlobToSVGPath(
+  blob: Uint8Array,
+  { precision, ...options }: GeometryBlobToSVGPathOptions = {},
+): string {
+  const num =
+    precision === undefined ? formatFloat32 : (n: number) => String(roundPathNumber(n, precision));
+
+  return parseCommandsBlob(blob, options)
+    .map((command) => {
+      switch (command.type) {
+        case "M":
+          return `M${num(command.x)} ${num(command.y)}`;
+        case "L":
+          return `L${num(command.x)} ${num(command.y)}`;
+        case "C":
+          return `C${num(command.c1x)} ${num(command.c1y)} ${num(command.c2x)} ${num(command.c2y)} ${num(command.x)} ${num(command.y)}`;
+        case "Z":
+          return "Z";
+      }
+    })
+    .join("");
 }
 
 export function parseSVGPathData(svgPath: string): VectorPathCommand[] {

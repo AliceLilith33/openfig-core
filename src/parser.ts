@@ -1,7 +1,8 @@
 /**
  * Isomorphic .fig binary parser.
  *
- * .fig files are ZIP archives containing:
+ * .fig files are usually ZIP archives (a bare canvas.fig binary is also
+ * accepted) containing:
  *   - canvas.fig (binary: prelude + version + kiwi-encoded chunks)
  *   - meta.json (optional)
  *   - thumbnail.png (optional)
@@ -113,13 +114,24 @@ export function parseFigBinary(data: Uint8Array): FigDocument {
 }
 
 /**
- * Parse a complete .fig file (ZIP archive).
- * Extracts canvas.fig, meta.json, thumbnail.png, and images/*.
+ * Parse a .fig, .deck or .jam file.
+ *
+ * Accepts either form Figma writes: a ZIP archive (from which canvas.fig,
+ * meta.json, thumbnail.png and images/* are extracted), or a bare canvas binary
+ * starting with a `fig-` prelude, which carries no meta, thumbnail or images.
  */
 export function parseFig(data: Uint8Array): FigDocument {
+  // A bare canvas binary: "fig-kiwi", "fig-jam.", "fig-deck" and so on.
+  if (data[0] === 0x66 && data[1] === 0x69 && data[2] === 0x67 && data[3] === 0x2d) {
+    return parseFigBinary(data);
+  }
+
   // Check ZIP header
   if (data[0] !== 0x50 || data[1] !== 0x4b) {
-    throw new Error("Not a valid .fig file (missing ZIP header)");
+    const head = Array.from(data.subarray(0, 8), (b) => b.toString(16).padStart(2, "0")).join(" ");
+    throw new Error(
+      `Not a valid .fig file: expected a ZIP archive ("PK") or a canvas binary ("fig-"), got ${head || "no bytes"}`,
+    );
   }
 
   const unzipped = unzipSync(data);

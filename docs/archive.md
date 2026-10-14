@@ -2,7 +2,7 @@
 
 ## ZIP Archive
 
-A `.fig`, `.deck`, or `.jam` file is a standard **ZIP archive** (uncompressed / store mode) containing:
+A `.fig`, `.deck`, or `.jam` file is normally a standard **ZIP archive** (uncompressed / store mode). `parseFig` also accepts the bare `canvas.fig` binary on its own, recognised by its `fig-` prelude. The archive contains:
 
 | File | Required | Description |
 |------|----------|-------------|

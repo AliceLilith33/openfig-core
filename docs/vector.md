@@ -169,9 +169,25 @@ supports both representations, and interoperability requires handling both.
 
 Returns the resolved `Uint8Array` for a blob index from `doc.message.blobs`.
 
-### `geometryBlobToSVGPath(blob)`
+### `parseCommandsBlob(blob, { strict })`
 
-Converts one resolved `commandsBlob` into an SVG `d` string.
+Decodes one resolved `commandsBlob` into `VectorPathCommand[]` (`M`, `L`, `C`,
+`Z`) with the stored float32 coordinates unchanged. The blob is a sequence of
+one-byte opcodes, each followed by little-endian float32s: `0` close, `1` move
+`(x, y)`, `2` line `(x, y)`, `4` cubic `(c1x, c1y, c2x, c2y, x, y)`. Opcode `3`
+appears in no reference file and is not decoded.
+
+An unknown opcode, or a command cut short by the end of the blob, throws with
+its byte offset. Pass `strict: false` to get the commands decoded before that
+point instead.
+
+### `geometryBlobToSVGPath(blob, { precision, strict })`
+
+Converts one resolved `commandsBlob` into an SVG `d` string. Coordinates are
+exact by default: each float32 is written in the shortest decimal that reads
+back to the same float32, so `encodeCommandsBlob(parseSVGPathData(d))`
+reproduces the blob byte for byte. Pass `precision: 2` for the shorter,
+lossy output of 0.4.x. `strict` behaves as in `parseCommandsBlob`.
 
 ### `resolveVectorNodePaths(doc, node)`
 

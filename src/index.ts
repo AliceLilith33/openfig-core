@@ -2,7 +2,7 @@ export { parseFig, parseFigBinary } from "./parser.js";
 export { encodeFigParts, assembleCanvasFig, createFigZip } from "./encoder.js";
 export { convertDeckToFig } from "./convert.js";
 export { createEmptyFigDoc } from "./template.js";
-export { nodeId, comparePosition, sortByPosition, positionAt } from "./utils.js";
+export { nodeId, comparePosition, sortByPosition, positionAt, liveChildren } from "./utils.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export {
   appendVectorPayloadToDocument,
@@ -11,6 +11,7 @@ export {
   encodeVectorNetworkBlob,
   geometryBlobToSVGPath,
   getBlobBytes,
+  parseCommandsBlob,
   parseSVGPathData,
   parseVectorNetworkBlob,
   resolveVectorNodePaths,
@@ -32,6 +33,8 @@ export type {
 export type {
   AppendVectorPayloadInput,
   AuthoredVectorPayload,
+  GeometryBlobToSVGPathOptions,
+  ParseCommandsBlobOptions,
   ResolvedGeometryPath,
   ResolvedVectorNodePaths,
   VectorGeometryInput,
