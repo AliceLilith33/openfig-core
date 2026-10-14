@@ -42,6 +42,7 @@ export {
 export { hexToFigColor, parseCssRgbColor, cssColorToFigColor, makeSolidPaint } from "./color.js";
 export { serializeSvgPathData, transformSvgPathData, mapStrokeJoin, mapStrokeCap } from "./svgPath.js";
 export type { FigDocument, FigNode, FigPaint, FigGuid, FigColor, FigTransform, FigGradientStop } from "./types.js";
+export type * as Kiwi from "./kiwi.js";
 export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from "./encoder.js";
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";

@@ -110,6 +110,20 @@ walk(doc, page, (node, depth) => {
 - `getAbsoluteTransform(doc, node)` — the node's transform in page coordinates (Figma's `absoluteTransform`). `getAbsoluteBoundingBox(doc, node)` — the box around its transformed `size`, without strokes or effects.
 - `multiplyTransform(a, b)`, `applyTransform(t, x, y)`, `IDENTITY_TRANSFORM`.
 
+## Wire-format types
+
+`Kiwi` holds a TypeScript type for every definition in the `.fig` schema (550 of them), generated from `src/utilities/figKiwiSchema.ts`:
+
+```ts
+import type { Kiwi } from 'openfig-core';
+
+const node = doc.nodes[0] as Kiwi.NodeChange;
+node.stackMode;          // Kiwi.StackMode | undefined: "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID"
+node.symbolData?.symbolOverrides;  // Kiwi.NodeChange[] | undefined
+```
+
+Enums are string unions, every message field is optional, `byte[]` is `Uint8Array` and 64-bit integers are `bigint`. `FigNode` stays loosely typed; cast to `Kiwi.NodeChange` where you want the checking. A file whose embedded schema is newer than ours can carry fields these types do not list.
+
 ## Resolving instances
 
 An `INSTANCE` has no children in the file: it shows its symbol's content, modified by its overrides. `resolveInstance` builds that content.
