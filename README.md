@@ -137,21 +137,23 @@ walkResolved(resolved, (r, depth) => {
 });
 ```
 
-Each `ResolvedNode` has `node` (a copy with everything applied), `source` (the node in the file), `path` (the `guidPath` an override for it would use), `symbol` (for an instance, after any swap) and `children`. Applied, in order: component property values, the instance's own overrides, overrides from enclosing instances (outer wins), then `derivedSymbolData`, which is Figma's computed layout. Pass `{ applyDerived: false }` to skip that last step.
+Each `ResolvedNode` has `node` (a copy with everything applied), `source` (the node in the file), `path` (the `guidPath` an override for it would use), `symbol` (for an instance, after any swap) and `children`. Applied, in order: component property values, the instance's own overrides, overrides from enclosing instances (outer wins), then `derivedSymbolData`, which is Figma's computed layout. Pass `{ applyDerived: false }` to skip that last step. When an enclosing instance swaps a nested instance (`overriddenSymbolID`, even to the same component), the nested instance's own overrides and derived data are dropped, as in Figma.
 
 `resolveTree(doc, node)` does the same for any node, expanding every instance beneath it. Nothing in `doc` is modified.
 
 ## Resolving variables
 
 ```ts
-import { resolvePaintColor, resolveBoundVariables, resolveVariable } from 'openfig-core';
+import { resolvePaint, resolveBoundVariables, resolveVariable } from 'openfig-core';
 
-resolvePaintColor(doc, node.fillPaints[0], { node });       // FigColor, following a colorVar binding
+resolvePaint(doc, node.fillPaints[0], { node });            // { color, opacity }, following a colorVar binding
 resolveBoundVariables(doc, node).get('CORNER_RADIUS');      // { type: 'FLOAT', value: 8, variable, modeID }
 resolveVariable(doc, { guid }, { modes: new Map([[setId, darkModeId]]) });
 ```
 
-Aliases are followed, local (`guid`) and library (`assetRef.key`) references both resolve, and the mode for each set comes from the nearest `variableModeBySetMap` on the node or its ancestors, else the set's first mode (`variableModes(set)`). A value that cannot be resolved — a variable not in the file, or an alias loop — is `undefined`; `resolvePaintColor` then falls back to the paint's own `color`.
+Aliases are followed, local (`guid`) and library (`assetRef.key`) references both resolve, and the mode for each set comes from the nearest `variableModeBySetMap` on the node or its ancestors, else the set's first mode (`variableModes(set)`). A value that cannot be resolved — a variable not in the file, or an alias loop — is `undefined`; `resolvePaint` then falls back to the paint's own `color` and `opacity`.
+
+A bound colour's alpha comes back as `opacity`, with `color.a` set to 1 — the form Figma caches it in — so draw with `color.a * opacity`. `resolvePaintColor` returns just the colour.
 
 ## Encoding (write .fig files)
 

@@ -22,14 +22,20 @@ Violating any of these produces silent failures or crashes on import.
 `position` is a fractional index that Figma compares **as a string**. Two rules
 follow from that, and both have cost real debugging time.
 
-**The alphabet is printable ASCII, `!` (0x21) through `~` (0x7E).** A character
-outside that range does not corrupt the node — Figma rejects the **entire file**
-with `Internal error during import` and names nothing about it. Everything else
+**Write positions from `!` (0x21) through `~` (0x7E).** A character past `~`
+does not corrupt the node — Figma rejects the **entire file** with
+`Internal error during import` and names nothing about it. Everything else
 checks out while this is wrong: the archive is intact, the message parses, GUIDs
 are unique, no reference dangles, and the file round-trips through a reader
 unchanged. In openfig-cli this shipped silently until a slide with 693 children
 produced 599 out-of-range positions and simply would not open. A bare `~` is
 legitimate and appears on the canvas in working decks.
+
+Figma's own alphabet starts one lower, at space (0x20). Across 522,294 positions
+in 179 public files, space is the only character outside `!`–`~` — 15,269
+occurrences in 101 files, 9,604 of them leading (`" ~"`, `" !"`) — and nothing
+past `~` ever appears. A reader must accept space; a writer gains nothing by
+using it, so `positionAt` stays within `!`–`~`.
 
 **Because comparison is lexicographic, overflowing naively into a second
 character reorders siblings.** `"!"` sorts before `"!!"`, which sorts before
