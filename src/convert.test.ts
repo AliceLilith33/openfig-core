@@ -439,4 +439,34 @@ describe("convertDeckToFig regressions", () => {
     // The slide instance flattens to 100's child; that child's expansion of 100 is cut off.
     expect(out.nodes.filter((n) => n.name === "INSTANCE 101")).toHaveLength(1);
   });
+
+  it("applies every override field and Figma's derived layout, and addresses the instance itself", () => {
+    // Real decks override visible, name and size, and Figma records the final
+    // layout in derivedSymbolData; only text, fill and stroke used to be applied.
+    const nodes = [
+      ...scaffold(),
+      { guid: gid(100), type: "SYMBOL", name: "Card", overrideKey: gid(100, 9) },
+      child(101, "TEXT", 100, "!", { overrideKey: gid(1, 9), name: "a", textData: { characters: "kept" } }),
+      child(102, "TEXT", 100, '"', { overrideKey: gid(2, 9), name: "b", textData: { characters: "hidden" } }),
+      child(10, "SLIDE", 3, "!"),
+      child(11, "FRAME", 10, "!", { name: "holder" }),
+      child(12, "INSTANCE", 11, "!", {
+        symbolData: {
+          symbolID: gid(100),
+          symbolOverrides: [
+            { guidPath: { guids: [gid(2, 9)] }, visible: false },
+            { guidPath: { guids: [gid(1, 9)] }, name: "renamed" },
+            { guidPath: { guids: [gid(100, 9)] }, name: "Hero" },
+          ],
+        },
+        derivedSymbolData: [{ guidPath: { guids: [gid(1, 9)] }, size: { x: 42, y: 7 } }],
+      }),
+    ];
+
+    const out = convertDeckToFig(mockDoc(nodes as FigNode[]));
+    const byName = (name: string) => out.nodes.find((n) => n.name === name)!;
+    expect(byName("Hero").type).toBe("FRAME");
+    expect(byName("renamed").size).toEqual({ x: 42, y: 7 });
+    expect(byName("b").visible).toBe(false);
+  });
 });

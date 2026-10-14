@@ -62,3 +62,22 @@ export function positionAt(index: number): string {
   }
   return out + String.fromCharCode(POSITION_FIRST + n);
 }
+
+/**
+ * Deep copy of decoded kiwi data: plain objects, arrays, typed arrays, Map and
+ * Set. JSON round-tripping turns a Uint8Array into an object, and walking
+ * `Object.keys` sees nothing in a Map.
+ */
+export function deepClone<T>(val: T): T {
+  if (val === null || val === undefined) return val;
+  if (val instanceof Uint8Array) return new Uint8Array(val) as any;
+  if (val instanceof Map) return new Map([...val].map(([k, v]) => [k, deepClone(v)])) as any;
+  if (val instanceof Set) return new Set([...val].map(deepClone)) as any;
+  if (Array.isArray(val)) return val.map(deepClone) as any;
+  if (typeof val === "object") {
+    const copy: any = {};
+    for (const k of Object.keys(val)) copy[k] = deepClone((val as any)[k]);
+    return copy;
+  }
+  return val;
+}

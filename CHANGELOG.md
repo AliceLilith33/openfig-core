@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`convertDeckToFig` copied variables without their parent.** Figma keeps `VARIABLE` and `VARIABLE_SET` nodes on the document's internal-only canvas, which the conversion did not carry over, leaving every variable pointing at a missing node. The internal-only canvas is now kept with its GUID; one is created when the source has none, and a variable whose parent is not carried over is moved onto it.
 - **`geometryBlobToSVGPath` discarded precision.** Rounding to two decimal places changed 92% of the coordinates in the reference corpus (1.03M of 1.12M). Output is now exact by default: `encodeCommandsBlob(parseSVGPathData(path))` reproduces every reference blob byte for byte.
 - **`geometryBlobToSVGPath` silently truncated** at an unknown opcode or a short final command, returning part of the shape as if it were all of it.
+- **`convertDeckToFig` applied only three override fields.** Overrides in real files set `visible`, `name`, `size` and `styleIdForFill` far more often than text or paint, and all of them were dropped, as was Figma's computed layout in `derivedSymbolData` and every override addressed to the instance itself (a path naming the symbol's own key). Conversion now goes through `resolveTree`, which applies all of them.
 - **`parseFig` rejected a bare canvas binary.** Input starting with a `fig-` prelude is now parsed directly; only ZIP archives were accepted before.
 
 ### Added
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
 - `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
 - `liveChildren(doc, id)` — a node's children in layer order, without `REMOVED` nodes.
+- `resolveInstance(doc, instance)` and `resolveTree(doc, node)` — what an instance displays: its symbol's content with overrides, `derivedSymbolData` and component property values applied, nested instances expanded and instance swaps followed. Every override and derived entry in the reference corpus (21,608 across 440 instances) lands on exactly one node, and every derived size and transform matches. With `walkResolved` and `overrideKeyOf`.
 - Tree helpers: `walk`, `findAll`, `parentOf`, `ancestors`, `pageOf`. They tolerate dangling parents and parent cycles.
 - `getAbsoluteTransform` and `getAbsoluteBoundingBox` — page coordinates, composed up to the node's `CANVAS`; with `multiplyTransform`, `applyTransform` and `IDENTITY_TRANSFORM`.
 
@@ -34,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known limitations
 
-- `convertDeckToFig` applies only `textData.characters`, `fillPaints` and `strokePaints` from overrides; `componentPropAssignments` and `derivedSymbolData` are not resolved.
+- Component property assignments (`componentPropAssignments` → `componentPropRefs`) are applied per the schema, but no reference file uses them, so that path is tested only against hand-built documents.
 
 ## [0.4.1] - 2026-08-01
 

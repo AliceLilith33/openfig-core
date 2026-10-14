@@ -15,6 +15,7 @@ export {
   getAbsoluteTransform,
   getAbsoluteBoundingBox,
 } from "./tree.js";
+export { resolveTree, resolveInstance, walkResolved, overrideKeyOf } from "./instance.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export {
   appendVectorPayloadToDocument,
@@ -34,6 +35,7 @@ export type { FigDocument, FigNode, FigPaint, FigGuid, FigColor, FigTransform, F
 export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from "./encoder.js";
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
+export type { ResolvedNode, ResolveOptions } from "./instance.js";
 export type {
   GradientFillLike,
   GradientKind,

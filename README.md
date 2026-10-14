@@ -110,6 +110,23 @@ walk(doc, page, (node, depth) => {
 - `getAbsoluteTransform(doc, node)` — the node's transform in page coordinates (Figma's `absoluteTransform`). `getAbsoluteBoundingBox(doc, node)` — the box around its transformed `size`, without strokes or effects.
 - `multiplyTransform(a, b)`, `applyTransform(t, x, y)`, `IDENTITY_TRANSFORM`.
 
+## Resolving instances
+
+An `INSTANCE` has no children in the file: it shows its symbol's content, modified by its overrides. `resolveInstance` builds that content.
+
+```ts
+import { resolveInstance, walkResolved } from 'openfig-core';
+
+const resolved = resolveInstance(doc, instanceNode);
+walkResolved(resolved, (r, depth) => {
+  console.log('  '.repeat(depth) + r.node.name, r.node.visible === false ? '(hidden)' : '');
+});
+```
+
+Each `ResolvedNode` has `node` (a copy with everything applied), `source` (the node in the file), `path` (the `guidPath` an override for it would use), `symbol` (for an instance, after any swap) and `children`. Applied, in order: component property values, the instance's own overrides, overrides from enclosing instances (outer wins), then `derivedSymbolData`, which is Figma's computed layout. Pass `{ applyDerived: false }` to skip that last step.
+
+`resolveTree(doc, node)` does the same for any node, expanding every instance beneath it. Nothing in `doc` is modified.
+
 ## Encoding (write .fig files)
 
 ### Round-trip: open, edit, save

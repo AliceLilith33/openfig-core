@@ -1,5 +1,7 @@
 import type { FigDocument, FigNode, FigGuid } from "./types.js";
-import { positionAt, sortByPosition } from "./utils.js";
+import { deepClone, positionAt, sortByPosition } from "./utils.js";
+import { resolveTree } from "./instance.js";
+import type { ResolvedNode } from "./instance.js";
 
 export interface ConvertOptions {
   title?: string;
@@ -13,36 +15,6 @@ const MAX_INSTANCE_DEPTH = 32;
 
 function guidToString(guid: FigGuid): string {
   return `${guid.sessionID}:${guid.localID}`;
-}
-
-function sameGuid(a: FigGuid | undefined, b: FigGuid | undefined): boolean {
-  return !!a && !!b && a.sessionID === b.sessionID && a.localID === b.localID;
-}
-
-function safeDeepClone<T>(val: T): T {
-  if (val === null || val === undefined) return val;
-  if (val instanceof Uint8Array) {
-    return new Uint8Array(val) as any;
-  }
-  // Object.keys() sees no entries on a Map or Set, so the generic object branch
-  // would turn `images` into `{}` and drop every image.
-  if (val instanceof Map) {
-    return new Map([...val].map(([k, v]) => [k, safeDeepClone(v)])) as any;
-  }
-  if (val instanceof Set) {
-    return new Set([...val].map(safeDeepClone)) as any;
-  }
-  if (Array.isArray(val)) {
-    return val.map(safeDeepClone) as any;
-  }
-  if (typeof val === "object") {
-    const copy: any = {};
-    for (const k of Object.keys(val)) {
-      copy[k] = safeDeepClone((val as any)[k]);
-    }
-    return copy;
-  }
-  return val;
 }
 
 /** Children of `id` in layer order, without relying on how the map was built. */
@@ -110,33 +82,6 @@ function collectSlidesInOrder(doc: FigDocument): FigNode[] {
   return ordered;
 }
 
-/** A symbol override whose `path` is relative to the symbol scope being baked. */
-interface ScopedOverride {
-  path: FigGuid[];
-  data: any;
-}
-
-function overridesOf(instance: FigNode): ScopedOverride[] {
-  const overrides: any[] = instance.symbolData?.symbolOverrides ?? [];
-  return overrides
-    .filter((o) => o?.guidPath?.guids?.length)
-    .map((o) => ({ path: o.guidPath.guids as FigGuid[], data: o }));
-}
-
-function applyOverride(clone: FigNode, override: any): void {
-  if (override.textData && clone.textData) {
-    let chars = override.textData.characters || "";
-    if (chars === "") chars = " "; // Prevent Figma silent crashes
-    clone.textData.characters = chars;
-  }
-  if (override.fillPaints) {
-    clone.fillPaints = safeDeepClone(override.fillPaints);
-  }
-  if (override.strokePaints) {
-    clone.strokePaints = safeDeepClone(override.strokePaints);
-  }
-}
-
 export function convertDeckToFig(
   deckDoc: FigDocument,
   options: ConvertOptions = {}
@@ -187,7 +132,7 @@ export function convertDeckToFig(
   const outputNodes: FigNode[] = [];
   // Keep the DOCUMENT node
   if (documentNode) {
-    outputNodes.push(safeDeepClone(documentNode));
+    outputNodes.push(deepClone(documentNode));
   }
   outputNodes.push(newCanvasNode);
 
@@ -203,35 +148,20 @@ export function convertDeckToFig(
     }
 
     const newIdx = outputBlobs.length;
-    outputBlobs.push(safeDeepClone(deckDoc.message.blobs[sourceIdx]));
+    outputBlobs.push(deepClone(deckDoc.message.blobs[sourceIdx]));
     blobRemap.set(sourceIdx, newIdx);
     return newIdx;
   }
 
   /**
-   * Clone `node` and its live descendants under `parentGuid`, giving every clone
-   * a fresh GUID, and push them in pre-order (parents before children).
-   *
-   * `overrides` carry paths relative to the symbol scope `node` belongs to; a
-   * path segment names a node by its `overrideKey`, falling back to its `guid`
-   * for nodes that have none. A nested INSTANCE opens a new scope: it is
-   * detached into a FRAME, and its symbol's children are baked under it with
-   * the instance's own overrides followed by the outer ones addressed through
-   * it — later entries win, so the outer override takes precedence.
-   *
-   * `symbolStack` lists the symbols being expanded; it is non-empty exactly when
-   * `node` comes from a symbol rather than from the slide itself.
+   * Emit a resolved node and its subtree under `parentGuid` with fresh GUIDs,
+   * parents before children. Instances are detached into FRAMEs: their symbols
+   * are not carried into the output, so a live INSTANCE would reference
+   * nothing. Their content, already resolved with overrides, component
+   * property values and derived layout applied, becomes the frame's children.
    */
-  function bakeNode(
-    node: FigNode,
-    parentGuid: FigGuid,
-    overrides: ScopedOverride[],
-    symbolStack: string[],
-    position?: string,
-  ): void {
-    if (node.phase === "REMOVED") return;
-
-    const clone = safeDeepClone(node);
+  function emit(resolved: ResolvedNode, parentGuid: FigGuid, fromSymbol: boolean, position?: string): void {
+    const clone = deepClone(resolved.node);
     clone.guid = generateGuid();
     clone.phase = "CREATED";
     clone.parentIndex = {
@@ -240,68 +170,28 @@ export function convertDeckToFig(
       position: position ?? clone.parentIndex?.position ?? "!",
     };
 
-    if (symbolStack.length > 0) {
+    if (fromSymbol) {
       // Remove slide-scaffolding parameters
       delete clone.slideThumbnailHash;
       delete clone.editInfo;
       delete clone.prototypeInteractions;
     }
-
-    const key: FigGuid = node.overrideKey ?? node.guid;
-    const direct = overrides.filter((o) => o.path.length === 1 && sameGuid(o.path[0], key));
-
-    if (node.type === "INSTANCE") {
-      let symbolGuid: FigGuid | undefined = node.symbolData?.symbolID;
-      for (const o of direct) {
-        if (o.data.overriddenSymbolID) symbolGuid = o.data.overriddenSymbolID; // instance swap
-      }
-
-      // Detach: the symbol is not carried into the output, so a live INSTANCE
-      // would reference nothing.
+    if (clone.type === "INSTANCE") {
       clone.type = "FRAME";
       delete clone.symbolData;
       delete clone.derivedSymbolData;
       delete clone.overriddenSymbolID;
-      for (const o of direct) applyOverride(clone, o.data);
-      outputNodes.push(clone);
-
-      const throughThis = overrides
-        .filter((o) => o.path.length > 1 && sameGuid(o.path[0], key))
-        .map((o) => ({ path: o.path.slice(1), data: o.data }));
-      bakeSymbolChildren(symbolGuid, clone.guid, [...overridesOf(node), ...throughThis], symbolStack);
-      return;
+      delete clone.componentPropAssignments;
     }
-
-    for (const o of direct) applyOverride(clone, o.data);
+    // Property definitions live on symbols, which are not carried over.
+    delete clone.componentPropRefs;
+    if (clone.textData && clone.textData.characters === "") {
+      clone.textData.characters = " "; // Figma rejects empty text silently
+    }
     outputNodes.push(clone);
 
-    for (const child of orderedChildren(deckDoc, guidToString(node.guid))) {
-      bakeNode(child, clone.guid, overrides, symbolStack);
-    }
-  }
-
-  function bakeSymbolChildren(
-    symbolGuid: FigGuid | undefined,
-    parentGuid: FigGuid,
-    overrides: ScopedOverride[],
-    symbolStack: string[],
-  ): void {
-    for (const { node, overrides: o, symbolStack: s } of symbolChildEntries(symbolGuid, overrides, symbolStack)) {
-      bakeNode(node, parentGuid, o, s);
-    }
-  }
-
-  function symbolChildEntries(
-    symbolGuid: FigGuid | undefined,
-    overrides: ScopedOverride[],
-    symbolStack: string[],
-  ): Array<{ node: FigNode; overrides: ScopedOverride[]; symbolStack: string[] }> {
-    if (!symbolGuid) return [];
-    const symId = guidToString(symbolGuid);
-    if (symbolStack.includes(symId) || symbolStack.length >= MAX_INSTANCE_DEPTH) return [];
-    if (!deckDoc.nodeMap.has(symId)) return [];
-    const stack = [...symbolStack, symId];
-    return orderedChildren(deckDoc, symId).map((node) => ({ node, overrides, symbolStack: stack }));
+    const inside = fromSymbol || resolved.source.type === "INSTANCE";
+    for (const child of resolved.children) emit(child, clone.guid, inside);
   }
 
   // 3. Process each slide
@@ -346,9 +236,9 @@ export function convertDeckToFig(
       opacity: 1,
       frameMaskDisabled: false,
       // Inherit fill paints and geometry from the SLIDE node
-      fillPaints: slide.fillPaints ? safeDeepClone(slide.fillPaints) : [],
-      fillGeometry: slide.fillGeometry ? safeDeepClone(slide.fillGeometry) : [],
-      strokePaints: slide.strokePaints ? safeDeepClone(slide.strokePaints) : [],
+      fillPaints: slide.fillPaints ? deepClone(slide.fillPaints) : [],
+      fillGeometry: slide.fillGeometry ? deepClone(slide.fillGeometry) : [],
+      strokePaints: slide.strokePaints ? deepClone(slide.strokePaints) : [],
       strokeWeight: slide.strokeWeight ?? 0,
       strokeAlign: slide.strokeAlign ?? "INSIDE",
     };
@@ -362,19 +252,13 @@ export function convertDeckToFig(
     // so their original positions do not interleave meaningfully.
     const slideChildren = orderedChildren(deckDoc, slideId).filter((c) => c.phase !== "REMOVED");
     const titleInstance = slideChildren.find((c) => c.type === "INSTANCE");
-    const entries: Array<{
-      node: FigNode;
-      overrides: ScopedOverride[];
-      symbolStack: string[];
-      owner: FigNode;
-    }> = [];
+    const entries: Array<{ resolved: ResolvedNode; fromSymbol: boolean; owner: FigNode }> = [];
     for (const child of slideChildren) {
-      if (child.type === "INSTANCE" && child.symbolData?.symbolID && deckDoc.nodeMap.has(guidToString(child.symbolData.symbolID))) {
-        for (const entry of symbolChildEntries(child.symbolData.symbolID, overridesOf(child), [])) {
-          entries.push({ ...entry, owner: child });
-        }
+      const resolved = resolveTree(deckDoc, child, { maxDepth: MAX_INSTANCE_DEPTH });
+      if (child.type === "INSTANCE" && resolved.symbol) {
+        for (const inner of resolved.children) entries.push({ resolved: inner, fromSymbol: true, owner: child });
       } else {
-        entries.push({ node: child, overrides: [], symbolStack: [], owner: child });
+        entries.push({ resolved, fromSymbol: false, owner: child });
       }
     }
 
@@ -383,11 +267,11 @@ export function convertDeckToFig(
     let slideTitle = "";
     entries.forEach((entry, i) => {
       const start = outputNodes.length;
-      bakeNode(entry.node, frameGuid, entry.overrides, entry.symbolStack, positionAt(i));
+      emit(entry.resolved, frameGuid, entry.fromSymbol, positionAt(i));
       if (!slideTitle && entry.owner === titleInstance) {
         const firstText = outputNodes
           .slice(start)
-          .find((n) => n.type === "TEXT" && n.textData?.characters);
+          .find((n) => n.type === "TEXT" && n.textData?.characters?.trim());
         slideTitle = firstText?.textData?.characters?.trim() ?? "";
       }
     });
@@ -414,7 +298,7 @@ export function convertDeckToFig(
       (n) => n.type === "CANVAS" && n.internalOnly && n.phase !== "REMOVED",
     );
     const internalCanvas: FigNode = sourceInternal
-      ? safeDeepClone(sourceInternal)
+      ? deepClone(sourceInternal)
       : {
           guid: generateGuid(),
           type: "CANVAS",
@@ -429,7 +313,7 @@ export function convertDeckToFig(
     const carried = new Set(supportNodes.map((n) => guidToString(n.guid)));
     carried.add(guidToString(internalCanvas.guid));
     for (const sNode of supportNodes) {
-      const clone = safeDeepClone(sNode);
+      const clone = deepClone(sNode);
       const parentGuid = clone.parentIndex?.guid;
       if (!parentGuid || !carried.has(guidToString(parentGuid))) {
         clone.parentIndex = {
@@ -462,7 +346,7 @@ export function convertDeckToFig(
   for (const children of childrenMap.values()) sortByPosition(children);
 
   // Carry over meta and images
-  const targetMeta = safeDeepClone(deckDoc.meta) || {};
+  const targetMeta = deepClone(deckDoc.meta) || {};
   targetMeta.file_name = canvasName;
 
   // Build the new FigDocument
@@ -503,7 +387,7 @@ export function convertDeckToFig(
     nodes: outputNodes,
     nodeMap,
     childrenMap,
-    schema: safeDeepClone(deckDoc.schema),
+    schema: deepClone(deckDoc.schema),
     compiledSchema: deckDoc.compiledSchema,
     rawChunks: [
       deckDoc.rawChunks[0], // Schema chunk (will be re-deflated or kept as-is)
@@ -511,13 +395,13 @@ export function convertDeckToFig(
       ...deckDoc.rawChunks.slice(2), // Remaining passthrough chunks
     ],
     message: {
-      ...safeDeepClone(deckDoc.message),
+      ...deepClone(deckDoc.message),
       nodeChanges: outputNodes,
       blobs: outputBlobs,
     },
     meta: targetMeta,
-    thumbnail: safeDeepClone(deckDoc.thumbnail),
-    images: safeDeepClone(deckDoc.images),
+    thumbnail: deepClone(deckDoc.thumbnail),
+    images: deepClone(deckDoc.images),
   };
 
   return newDoc;
