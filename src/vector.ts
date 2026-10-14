@@ -133,6 +133,11 @@ export interface GeometryBlobToSVGPathOptions extends ParseCommandsBlobOptions {
    * back to the same float32.
    */
   precision?: number;
+  /**
+   * Write coordinates with this many significant digits, as C's `%g` does —
+   * the format of Figma's REST API, which uses 6. Ignored with `precision`.
+   */
+  significantDigits?: number;
 }
 
 /**
@@ -199,6 +204,32 @@ export function parseCommandsBlob(
 }
 
 /** Shortest decimal string that reads back to the same float32. */
+/** `n` as C's `%.<digits>g` writes it: trailing zeros dropped, an exponent for very large or small values. */
+export function formatG(n: number, digits: number): string {
+  if (n === 0) return "0";
+  if (!Number.isFinite(n)) return String(n);
+  // printf rounds an exact tie to even; JavaScript rounds it away from zero.
+  // A tie shows as a 5 in the next digit, so only then look at the exact value.
+  const next = n.toPrecision(digits + 1);
+  const end = next.indexOf("e");
+  if (next[(end < 0 ? next.length : end) - 1] === "5") {
+    const exact = Math.abs(n).toExponential(Math.min(100, digits + 40));
+    const ds = exact.slice(0, exact.indexOf("e")).replace(".", "");
+    if (ds[digits] === "5" && /^0*$/.test(ds.slice(digits + 1)) && Number(ds[digits - 1]) % 2 === 0) {
+      n = Math.sign(n) * Number(`${ds[0]}.${ds.slice(1, digits)}e${exact.slice(exact.indexOf("e") + 1)}`);
+    }
+  }
+  const trim = (t: string) => (t.includes(".") ? t.replace(/0+$/, "").replace(/\.$/, "") : t);
+  const fixed = n.toPrecision(digits);
+  const a = Math.abs(Number(fixed));
+  // toPrecision writes plain decimals in this range, where %g does too.
+  if (a >= 1e-4 && a < 10 ** digits) return trim(fixed);
+  const [mantissa, e] = n.toExponential(digits - 1).split("e");
+  const exp = Number(e);
+  const abs = Math.abs(exp);
+  return `${trim(mantissa)}e${exp < 0 ? "-" : "+"}${abs < 10 ? "0" : ""}${abs}`;
+}
+
 function formatFloat32(n: number): string {
   if (Number.isInteger(n)) return String(n);
   // The shortest digit count that round-trips through float32. If d digits
@@ -216,10 +247,12 @@ function formatFloat32(n: number): string {
 
 export function geometryBlobToSVGPath(
   blob: Uint8Array,
-  { precision, ...options }: GeometryBlobToSVGPathOptions = {},
+  { precision, significantDigits, ...options }: GeometryBlobToSVGPathOptions = {},
 ): string {
   const num =
-    precision === undefined ? formatFloat32 : (n: number) => String(roundPathNumber(n, precision));
+    precision !== undefined ? (n: number) => String(roundPathNumber(n, precision))
+    : significantDigits !== undefined ? (n: number) => formatG(n, significantDigits)
+    : formatFloat32;
 
   return parseCommandsBlob(blob, options)
     .map((command) => {

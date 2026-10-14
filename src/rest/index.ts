@@ -17,6 +17,7 @@ import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
 import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
 import { interactions } from "./interactions.js";
 import { textFields } from "./text.js";
+import { collectionIdOfRef, restCollectionId } from "./variables.js";
 
 export interface ToRestOptions {
   /** Include `fillGeometry` and `strokeGeometry`, as `?geometry=paths` does. Default false, as in REST. */
@@ -181,6 +182,12 @@ function restType(n: FigNode): string {
   }
 }
 
+const OVERFLOW: Record<string, string> = {
+  HORIZONTAL: "HORIZONTAL_SCROLLING",
+  VERTICAL: "VERTICAL_SCROLLING",
+  BOTH: "HORIZONTAL_AND_VERTICAL_SCROLLING",
+};
+
 const FRAME_LIKE = new Set(["FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INSTANCE"]);
 
 /** The only fields REST gives a SECTION besides its id, name and children. */
@@ -280,10 +287,12 @@ function geometry(ctx: Ctx, list: any[] | undefined): Rest.Path[] {
   for (const g of list ?? []) {
     const bytes = g?.commandsBlob !== undefined ? getBlobBytes(ctx.doc, g.commandsBlob) : undefined;
     if (!bytes) continue;
-    const svg = geometryBlobToSVGPath(bytes, { strict: false });
+    const svg = geometryBlobToSVGPath(bytes, { strict: false, significantDigits: 6 });
     if (!svg) continue;
-    const path: any = { path: svg, windingRule: g.windingRule === "ODD" ? "EVENODD" : "NONZERO" };
+    // In the order REST writes the keys.
+    const path: any = { path: svg };
     if (g.styleID) path.overrideID = g.styleID;
+    path.windingRule = g.windingRule === "ODD" ? "EVENODD" : "NONZERO";
     out.push(path);
   }
   return out;
@@ -352,6 +361,16 @@ function layoutContainer(n: any, out: any): void {
   const mode = stackOf(n);
   if (!mode) return;
   out.layoutMode = mode;
+  if (mode === "GRID") {
+    const rows = gridTracks(n.gridRows);
+    const columns = gridTracks(n.gridColumns);
+    out.gridRowCount = rows.length;
+    out.gridColumnCount = columns.length;
+    out.gridRowGap = n.gridRowGap ?? 0;
+    out.gridColumnGap = n.gridColumnGap ?? 0;
+    out.gridRowsSizing = trackSizing(rows, n.gridRowsSizing);
+    out.gridColumnsSizing = trackSizing(columns, n.gridColumnsSizing);
+  }
   // kiwi omits stackCounterSizing when FIXED and stackPrimarySizing when it hugs.
   const primary = n.stackPrimarySizing ?? "RESIZE_TO_FIT_WITH_IMPLICIT_SIZE";
   const counter = n.stackCounterSizing ?? "FIXED";
@@ -376,21 +395,70 @@ function layoutContainer(n: any, out: any): void {
   }
 }
 
+/** A grid's row or column ids, in order. */
+function gridTracks(map: any): string[] {
+  const entries: any[] = [...(map?.entries ?? [])];
+  entries.sort((a, b) => comparePosition(a.position, b.position));
+  return entries.map((e) => guidString(e.id));
+}
+
+function trackSize(f: any): string {
+  switch (f?.type) {
+    case "FIXED": return `${f.value ?? 0}px`;
+    case "FLEX": return `${f.value ?? 1}fr`;
+    default: return "auto";
+  }
+}
+
+/** Track sizes as a CSS track list: `auto` hugs, `1fr` flexes, `120px` is fixed. */
+function trackSizing(tracks: string[], map: any): string {
+  const byId = new Map<string, any>();
+  for (const e of map?.entries ?? []) byId.set(guidString(e.id), e.trackSize);
+  return tracks
+    .map((id) => {
+      const t = byId.get(id);
+      const min = trackSize(t?.minSizing);
+      const max = trackSize(t?.maxSizing);
+      return min === max ? max : `minmax(${min}, ${max})`;
+    })
+    .join(" ");
+}
+
+const GRID_CHILD_ALIGN: Record<string, string> = { AUTO: "AUTO", MIN: "MIN", CENTER: "CENTER", MAX: "MAX" };
+
+function gridChild(n: any, parent: any, out: any): void {
+  const rows = gridTracks(parent.gridRows);
+  const columns = gridTracks(parent.gridColumns);
+  const row = n.gridRowAnchor ? rows.indexOf(guidString(n.gridRowAnchor)) : -1;
+  const column = n.gridColumnAnchor ? columns.indexOf(guidString(n.gridColumnAnchor)) : -1;
+  if (row >= 0) out.gridRowAnchorIndex = row;
+  if (column >= 0) out.gridColumnAnchorIndex = column;
+  out.gridRowSpan = n.gridRowSpan ?? 1;
+  out.gridColumnSpan = n.gridColumnSpan ?? 1;
+  out.gridChildHorizontalAlign = GRID_CHILD_ALIGN[n.gridChildHorizontalAlign] ?? "AUTO";
+  out.gridChildVerticalAlign = GRID_CHILD_ALIGN[n.gridChildVerticalAlign] ?? "AUTO";
+}
+
 /** Sizing of one axis: FIXED, HUG (sizes to content) or FILL (stretches in the parent). */
 function axisSizing(n: any, parent: any, axis: "H" | "V"): "FIXED" | "HUG" | "FILL" {
   const parentMode = stackOf(parent);
   const absolute = n.stackPositioning === "ABSOLUTE";
-  if (parentMode && parentMode !== "GRID" && !absolute) {
-    const primary = (parentMode === "HORIZONTAL") === (axis === "H");
-    if (primary ? n.stackChildPrimaryGrow === 1 : n.stackChildAlignSelf === "STRETCH") return "FILL";
-  }
   const mode = stackOf(n);
+  // An auto-layout child that hugs on this axis hugs, even when it is also
+  // set to stretch: Figma sizes it to its content.
+  let own: "FIXED" | "HUG" | undefined;
   if (mode && mode !== "GRID") {
     const primary = (mode === "HORIZONTAL") === (axis === "H");
     const sizing = primary ? n.stackPrimarySizing ?? "RESIZE_TO_FIT_WITH_IMPLICIT_SIZE" : n.stackCounterSizing ?? "FIXED";
-    return sizing === "FIXED" ? "FIXED" : "HUG";
+    own = sizing === "FIXED" ? "FIXED" : "HUG";
   }
-  if (n.type === "TEXT") {
+  if (parentMode && parentMode !== "GRID" && !absolute && own !== "HUG") {
+    const primary = (parentMode === "HORIZONTAL") === (axis === "H");
+    if (primary ? n.stackChildPrimaryGrow === 1 : n.stackChildAlignSelf === "STRETCH") return "FILL";
+  }
+  if (own) return own;
+  // Absolutely placed text keeps its box.
+  if (n.type === "TEXT" && !(parentMode && absolute)) {
     if (n.textAutoResize === "WIDTH_AND_HEIGHT") return "HUG";
     if (n.textAutoResize === "HEIGHT" && axis === "V") return "HUG";
   }
@@ -403,6 +471,7 @@ function layoutChild(n: any, parent: any, out: any): void {
     out.layoutAlign = n.stackChildAlignSelf === "STRETCH" ? "STRETCH" : "INHERIT";
     out.layoutGrow = n.stackChildPrimaryGrow === 1 ? 1 : 0;
     if (n.stackPositioning === "ABSOLUTE") out.layoutPositioning = "ABSOLUTE";
+    else if (stackOf(parent) === "GRID") gridChild(n, parent, out);
   }
   if (inStack || stackOf(n)) {
     out.layoutSizingHorizontal = axisSizing(n, parent, "H");
@@ -512,10 +581,16 @@ function componentProperties(ctx: Ctx, instance: any, symbol: FigNode | undefine
   return out;
 }
 
-function propertyReferences(n: any, owner: FigNode | undefined): Record<string, string> | undefined {
+function propertyReferences(ctx: Ctx, n: any, owner: FigNode | undefined): Record<string, string> | undefined {
   const refs: any[] = (n.componentPropRefs ?? []).filter((r: any) => !r?.isDeleted);
   if (!refs.length || !owner) return undefined;
-  const defs = new Map<string, any>(((owner as any).componentPropDefs ?? []).map((d: any) => [guidString(d.id), d]));
+  // A variant carries a stub per property of its set, naming the set's
+  // definition by parentPropDefId.
+  const set = owner.parentIndex ? ctx.doc.nodeMap.get(guidString(owner.parentIndex.guid)) : undefined;
+  const all: any[] = [...((owner as any).componentPropDefs ?? []), ...((set as any)?.isStateGroup ? (set as any).componentPropDefs ?? [] : [])];
+  const byId = new Map<string, any>(all.map((d: any) => [guidString(d.id), d]));
+  const defs = new Map<string, any>();
+  for (const [id, d] of byId) defs.set(id, d.name === undefined && d.parentPropDefId ? byId.get(guidString(d.parentPropDefId)) : d);
   const FIELDS: Record<string, string> = { VISIBLE: "visible", TEXT_DATA: "characters", OVERRIDDEN_SYMBOL_ID: "mainComponent" };
   const out: Record<string, string> = {};
   for (const r of refs) {
@@ -568,6 +643,18 @@ function withModes(ctx: Ctx, modes: Map<string, FigGuid>, n: any): Map<string, F
     if (set && e.variableModeID) next.set(nodeId(set)!, e.variableModeID);
   }
   return next;
+}
+
+/** REST `explicitVariableModes`: the modes set on the node itself, by collection id. */
+function explicitVariableModes(ctx: Ctx, n: any): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const e of n.variableModeBySetMap?.entries ?? []) {
+    if (!e?.variableModeID) continue;
+    const set = findVariableSet(ctx.doc, e.variableSetID);
+    const id = set ? restCollectionId(set) : collectionIdOfRef(e.variableSetID);
+    if (id) out[id] = guidString(e.variableModeID);
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function flowStartingPoints(ctx: Ctx, r: ResolvedNode): Rest.FlowStartingPoint[] {
@@ -628,10 +715,12 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
   const rot = Math.atan2(rel.m10, rel.m00);
   if (rot !== 0) out.rotation = rot;
 
-  const refs = propertyReferences(n, scope.propOwner);
+  const refs = propertyReferences(ctx, n, scope.propOwner);
   if (refs) out.componentPropertyReferences = refs;
   const bound = boundVariables(n);
   if (bound) out.boundVariables = bound;
+  const explicit = explicitVariableModes(ctx, n);
+  if (explicit) out.explicitVariableModes = explicit;
 
   // A scaled instance (K-scaled in Figma) scales its own lengths and those of its contents.
   const scale = scope.scale * (type === "INSTANCE" ? n.symbolData?.uniformScaleFactor ?? 1 : 1);
@@ -687,6 +776,8 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     const top = [...fills].reverse().find((p: any) => p.visible !== false) as any;
     out.backgroundColor = top?.type === "SOLID" ? { ...top.color, a: top.color.a * (top.opacity ?? 1) } : { r: 0, g: 0, b: 0, a: 0 };
     layoutContainer(n, out);
+    const overflow = OVERFLOW[n.scrollDirection];
+    if (overflow) out.overflowDirection = overflow;
     const grids = layoutGrids(n.layoutGrids);
     if (grids) out.layoutGrids = grids;
   }

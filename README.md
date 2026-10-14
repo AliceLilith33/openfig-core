@@ -162,6 +162,7 @@ import { toRestDocument } from 'openfig-core';
 
 const file = toRestDocument(doc);                   // GetFileResponse-shaped: document, components, componentSets, styles
 const withPaths = toRestDocument(doc, { geometry: true }); // adds fillGeometry / strokeGeometry, as ?geometry=paths does
+const variables = toRestVariables(doc);             // GET /v1/files/:key/variables/local
 ```
 
 The result is what Figma's REST API returns for the same file, typed with `@figma/rest-api-spec`, so tools written for the REST API can read a local `.fig`. Instances are expanded with REST's sublayer ids (`I<instance>;<key>`), shared styles and bound variables show their current values, and layout, text and interaction fields follow REST's names and defaults. Checked against REST responses for two community files, 99.78% of fields match; [docs/rest.md](docs/rest.md) lists the mapping rules and the known differences.

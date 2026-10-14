@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { nodeId, parseFig, resolveTree, toRestDocument, walkResolved } from "../index.js";
+import { nodeId, parseFig, resolveTree, toRestDocument, toRestVariables, walkResolved } from "../index.js";
 import type { FigDocument, FigGuid, FigNode } from "../index.js";
 
 const G = (localID: number): FigGuid => ({ sessionID: 1, localID });
@@ -139,9 +139,9 @@ describe("toRestDocument", () => {
       } as any,
     ])).document);
     expect(rest.get("1:1").interactions).toEqual([
-      { trigger: { type: "ON_HOVER" }, actions: [{ type: "NODE", destinationId: "1:2", navigation: "CHANGE_TO", transition: { type: "SMART_ANIMATE", duration: 0.2, easing: { type: "EASE_OUT" } } }] },
-      { trigger: { type: "ON_CLICK" }, actions: [{ type: "NODE", destinationId: "1:2", navigation: "OVERLAY", transition: { type: "MOVE_IN", direction: "LEFT", duration: 0.3, easing: { type: "LINEAR" } } }] },
-      { trigger: { type: "AFTER_TIMEOUT", timeout: 2 }, actions: [{ type: "URL", url: "https://example.com", openInNewTab: true }] },
+      { trigger: { type: "ON_HOVER" }, actions: [{ type: "NODE", destinationId: "1:2", navigation: "CHANGE_TO", transition: { type: "SMART_ANIMATE", duration: 200, easing: { type: "EASE_OUT" } } }] },
+      { trigger: { type: "ON_CLICK" }, actions: [{ type: "NODE", destinationId: "1:2", navigation: "OVERLAY", transition: { type: "MOVE_IN", direction: "LEFT", duration: 300, easing: { type: "LINEAR" } } }] },
+      { trigger: { type: "AFTER_TIMEOUT", timeout: 2000 }, actions: [{ type: "URL", url: "https://example.com", openInNewTab: true }] },
     ]);
   });
 
@@ -168,6 +168,79 @@ describe("toRestDocument", () => {
     expect(rest.get("1:1")).toMatchObject({ size: { x: 35, y: 45 }, absoluteBoundingBox: { x: 10, y: 20, width: 35, height: 45 } });
     expect(rest.get("1:3")).toMatchObject({ size: { x: 0, y: 0 }, relativeTransform: [[1, 0, 0], [0, 1, 0]] });
     expect(JSON.stringify(rest.get("1:3"))).not.toContain("null,");
+  });
+
+  it("sizes a child that both hugs and stretches by its content, and absolute text by its box", () => {
+    const rest = index(toRestDocument(docOf([
+      { id: 1, parent: 100, type: "FRAME", stackMode: "VERTICAL", stackPrimarySizing: "FIXED", size: { x: 300, y: 200 } },
+      // Its own row hugs; the stretch is stale and Figma sizes it to its content.
+      { id: 2, parent: 1, type: "FRAME", stackMode: "HORIZONTAL", stackChildAlignSelf: "STRETCH", stackCounterSizing: "RESIZE_TO_FIT_WITH_IMPLICIT_SIZE" },
+      { id: 3, parent: 1, type: "FRAME", stackMode: "HORIZONTAL", stackPrimarySizing: "FIXED", stackChildAlignSelf: "STRETCH" },
+      { id: 4, parent: 1, type: "TEXT", stackPositioning: "ABSOLUTE", textAutoResize: "HEIGHT", textData: { characters: "x" } },
+    ] as any)).document);
+    expect(rest.get("1:2")).toMatchObject({ layoutAlign: "STRETCH", layoutSizingHorizontal: "HUG" });
+    expect(rest.get("1:3")).toMatchObject({ layoutSizingHorizontal: "FILL" });
+    expect(rest.get("1:4")).toMatchObject({ layoutPositioning: "ABSOLUTE", layoutSizingHorizontal: "FIXED", layoutSizingVertical: "FIXED" });
+  });
+
+  it("gives grids, scrolling and explicit variable modes", () => {
+    const track = (localID: number, type: string, value = 1) => ({ id: G(localID), trackSize: { minSizing: { type, value }, maxSizing: { type, value } } });
+    const rest = index(toRestDocument(docOf([
+      { id: 50, parent: 100, type: "VARIABLE_SET", name: "Theme", variableSetModes: [{ id: G(51), name: "Light", sortPosition: "a" }, { id: G(52), name: "Dark", sortPosition: "b" }] },
+      {
+        id: 1, parent: 100, type: "FRAME", stackMode: "GRID", gridRowGap: 4, gridColumnGap: 8, scrollDirection: "VERTICAL",
+        variableModeBySetMap: { entries: [{ variableSetID: { guid: G(50) }, variableModeID: G(52) }] },
+        gridRows: { entries: [{ id: G(60), position: "a" }] },
+        gridColumns: { entries: [{ id: G(71), position: "b" }, { id: G(70), position: "a" }] },
+        gridRowsSizing: { entries: [track(60, "HUG")] },
+        gridColumnsSizing: { entries: [track(70, "FIXED", 120), { id: G(71), trackSize: { minSizing: { type: "FIXED", value: 40 }, maxSizing: { type: "FLEX", value: 1 } } }] },
+      },
+      { id: 2, parent: 1, type: "ROUNDED_RECTANGLE", gridRowAnchor: G(60), gridColumnAnchor: G(71), gridChildHorizontalAlign: "CENTER" },
+    ] as any)).document);
+    expect(rest.get("1:1")).toMatchObject({
+      layoutMode: "GRID", gridRowCount: 1, gridColumnCount: 2, gridRowGap: 4, gridColumnGap: 8,
+      gridRowsSizing: "auto", gridColumnsSizing: "120px minmax(40px, 1fr)",
+      overflowDirection: "VERTICAL_SCROLLING",
+      explicitVariableModes: { "VariableCollectionId:1:50": "1:52" },
+    });
+    expect(rest.get("1:2")).toMatchObject({ gridRowAnchorIndex: 0, gridColumnAnchorIndex: 1, gridRowSpan: 1, gridColumnSpan: 1, gridChildHorizontalAlign: "CENTER", gridChildVerticalAlign: "AUTO" });
+  });
+
+  it("names a variant's layers' properties by the set's definitions", () => {
+    const rest = index(toRestDocument(docOf([
+      { id: 1, parent: 100, type: "FRAME", isStateGroup: true, componentPropDefs: [{ id: G(90), name: "Label", type: "TEXT", initialValue: { textValue: { characters: "OK" } } }] },
+      // Each variant carries a stub naming the set's definition.
+      { id: 2, parent: 1, type: "SYMBOL", name: "State=Default", componentPropDefs: [{ id: G(91), parentPropDefId: G(90) }] },
+      { id: 3, parent: 2, type: "TEXT", textData: { characters: "OK" }, componentPropRefs: [{ defID: G(91), componentPropNodeField: "TEXT_DATA" }] },
+    ] as any)).document);
+    expect(rest.get("1:3").componentPropertyReferences).toEqual({ characters: "Label#1:90" });
+  });
+
+  it("converts variables to the local variables response", () => {
+    const doc = docOf([
+      { id: 50, parent: 100, type: "VARIABLE_SET", name: "Theme", isPublishable: true, variableSetModes: [{ id: G(51), name: "Light", sortPosition: "a" }, { id: G(52), name: "Dark", sortPosition: "b" }] },
+      {
+        id: 60, parent: 100, type: "VARIABLE", name: "bg", variableSetID: { guid: G(50) }, variableResolvedType: "COLOR", isPublishable: false,
+        variableScopes: ["FRAME_FILL", "STROKE"], codeSyntax: { entries: [{ platform: "WEB", value: "--bg" }] },
+        variableDataValues: { entries: [
+          { modeID: G(51), variableData: { dataType: "COLOR", resolvedDataType: "COLOR", value: { colorValue: { r: 1, g: 1, b: 1, a: 1 } } } },
+          { modeID: G(52), variableData: { dataType: "ALIAS", resolvedDataType: "COLOR", value: { alias: { guid: G(61) } } } },
+        ] },
+      },
+      { id: 61, parent: 100, type: "VARIABLE", name: "gap", key: "k61", version: "3:4", sourceLibraryKey: "lib", variableSetID: { guid: G(50) }, variableResolvedType: "FLOAT", isSoftDeleted: true, variableDataValues: { entries: [{ modeID: G(51), variableData: { dataType: "FLOAT", value: { floatValue: 8 } } }] } },
+    ] as any);
+    const { meta } = toRestVariables(doc);
+    expect(meta.variableCollections["VariableCollectionId:1:50"]).toEqual({
+      id: "VariableCollectionId:1:50", name: "Theme", key: "", modes: [{ modeId: "1:51", name: "Light" }, { modeId: "1:52", name: "Dark" }],
+      defaultModeId: "1:51", remote: false, hiddenFromPublishing: false, variableIds: ["VariableID:1:60", "VariableID:k61/3:4"],
+    });
+    expect(meta.variables["VariableID:1:60"]).toEqual({
+      id: "VariableID:1:60", name: "bg", key: "", variableCollectionId: "VariableCollectionId:1:50", resolvedType: "COLOR",
+      valuesByMode: { "1:51": { r: 1, g: 1, b: 1, a: 1 }, "1:52": { type: "VARIABLE_ALIAS", id: "VariableID:1:61" } },
+      remote: false, description: "", hiddenFromPublishing: true, scopes: ["FRAME_FILL", "STROKE_COLOR"], codeSyntax: { WEB: "--bg" },
+    });
+    // A library variable is identified by key and version, as references to it are.
+    expect(meta.variables["VariableID:k61/3:4"]).toMatchObject({ remote: true, deletedButReferenced: true, valuesByMode: { "1:51": 8 }, scopes: ["ALL_SCOPES"] });
   });
 
   it("converts a reference file, giving every resolved node one REST node", () => {

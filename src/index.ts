@@ -30,6 +30,7 @@ export {
 } from "./variables.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export { toRestDocument } from "./rest/index.js";
+export { toRestVariables } from "./rest/variables.js";
 export {
   appendVectorPayloadToDocument,
   encodeCommandsBlob,
@@ -51,6 +52,7 @@ export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
 export type { ResolvedNode, ResolveOptions } from "./instance.js";
 export type { RestFile, ToRestOptions } from "./rest/index.js";
+export type { RestVariables } from "./rest/variables.js";
 export type { FigVariableRef, ResolveVariableOptions, ResolvedPaint, ResolvedVariableValue } from "./variables.js";
 export type {
   GradientFillLike,

@@ -6,6 +6,10 @@ the `.fig` alone. Its types are `@figma/rest-api-spec`'s, so anything written
 against the REST API — FigmaToCode, Framelink, a design-token exporter — can
 read a local file.
 
+`toRestVariables(doc)` returns what `GET /v1/files/:key/variables/local`
+returns: the file's variables and collections, with library ones copied into
+the file marked `remote`.
+
 ## How it was checked
 
 Two Figma Community files exist both as `.fig` and as a REST archive of the
@@ -16,8 +20,10 @@ field of every node:
 
 - All 12,356 REST nodes are produced with the same ids, including 2,924
   instance sublayers.
-- 99.78% of fields match (291,170 of 291,816), not counting
+- 99.78% of fields match (291,176 of 291,816), not counting
   `absoluteRenderBounds` and the undocumented `vectorNetwork`.
+- 99.8% of `fillGeometry` and `strokeGeometry` lists are byte for byte the
+  same (24,655 of 24,700).
 
 `src/rest/rest.test.ts` repeats the comparison when `OPENFIG_REST_PAIRS` points
 at a folder holding `<name>.fig` next to `<name>/document.json`. It also runs
@@ -47,6 +53,15 @@ Most fields are renamed one to one. These are the ones that are not.
 "FIXED"`). A text without `lineHeight` is "Auto". `stackCounterSpacing` NaN means
 the same gap as `stackSpacing`.
 
+**Sizing.** A child set to stretch (or grow) in auto layout is FILL, unless it
+is an auto-layout frame that hugs on that axis: then Figma sizes it to its
+content and reports HUG. Absolutely placed text is FIXED both ways.
+
+**Grids.** A GRID frame reports its row and column counts, gaps, and the track
+sizes as CSS-like track lists (`auto` hugs, `1fr` flexes, `120px` is fixed,
+`minmax()` when the two differ); a child reports its anchor row and column
+indexes, spans and alignment.
+
 **Line heights.** kiwi `PIXELS` → `PIXELS`; kiwi `PERCENT` is a percentage of
 the font's own line height → `INTRINSIC_%` (no `lineHeightPercentFontSize`);
 kiwi `RAW` is a multiple of the font size → `FONT_SIZE_%`. The font's own line
@@ -64,6 +79,17 @@ under `fills`/`strokes` as well.
 at the node: `variableModeBySetMap` on the node or the nearest node above it in
 the expanded tree. Variable ids are `VariableID:s:l` for local variables and
 `VariableID:<key>/<version>` for library ones.
+
+**Variable modes.** `explicitVariableModes` lists the modes set on the node
+itself, by collection id (`VariableCollectionId:s:l`, or by key and version
+for a library collection) to mode id. In the variables response, a library
+variable's id is `VariableID:<key>/<version>`, as references to it are
+written; kiwi scopes `STROKE` are REST's `STROKE_COLOR`; `isSoftDeleted` is
+`deletedButReferenced`.
+
+**Component properties.** Each variant of a set carries a stub for every
+property of the set, naming the set's definition by `parentPropDefId`; a
+layer's `componentPropertyReferences` name the set's property.
 
 **Instance `overrides`.** An outermost instance lists its own `symbolOverrides`,
 by target id, with each kiwi field named as REST names it (`size` → `width`,
@@ -84,6 +110,13 @@ children are all hidden, and of a boolean operation with an empty result. JSON
 cannot hold NaN, so such a node is placed at its parent's origin and sized to
 the box around its children.
 
+**Paths.** Coordinates are written as C's `%g` writes them: 6 significant
+digits, an exponent below 0.0001 (`5.65418e-05`), ties rounded to even. A
+path's keys come in REST's order: `path`, `overrideID`, `windingRule`.
+
+**Scrolling.** `scrollDirection` is `overflowDirection`
+(`VERTICAL_SCROLLING`, ...).
+
 **`backgroundColor`** (deprecated) is the topmost visible fill when that is a
 solid colour, else transparent.
 
@@ -92,7 +125,8 @@ Regular. `layoutVersion` is reported from 3 on. A truncated text has
 `textAutoResize: "TRUNCATE"`, and every run in its `styleOverrideTable` repeats
 `textTruncation`. Trailing zeros of `characterStyleOverrides` are dropped.
 
-**Interactions.** kiwi `SWAP_STATE` is REST `CHANGE_TO`; `DRAG` is `ON_DRAG`;
+**Interactions.** kiwi stores times in seconds; REST's transition durations,
+timeouts and delays are in milliseconds. kiwi `SWAP_STATE` is REST `CHANGE_TO`; `DRAG` is `ON_DRAG`;
 directional transitions are named by where they come from in kiwi
 (`MOVE_FROM_RIGHT`) and by their direction of motion in REST (`MOVE_IN`,
 `LEFT`).
@@ -106,5 +140,11 @@ directional transitions are named by where they come from in kiwi
 - GROUP and VECTOR corner fields Figma derives from their children or vertices
   are not produced (about 500 mismatches). They never change rendering.
 - `vectorNetwork`, an undocumented REST field, is not produced.
+- Eight text layers that kiwi marks as growing in both directions are FIXED in
+  REST, for a reason not found in the file.
+- `toRestVariables` has not been compared with a REST response: the public
+  pairs include none.
+- The track sizing format of grids is not documented by Figma and has not been
+  checked against a REST response.
 - An instance scaled with K (`uniformScaleFactor`) shows its own stroke weight
   unscaled in a few cases (11).

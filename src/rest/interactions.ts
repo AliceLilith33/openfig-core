@@ -3,6 +3,11 @@ import { guidString } from "./paint.js";
 
 const SENTINEL = 0xffffffff;
 
+/** kiwi times are in seconds (stored as float32); REST's are in milliseconds. */
+function ms(seconds: number | undefined, fallback = 0): number {
+  return Math.round((seconds ?? fallback) * 1e6) / 1e3;
+}
+
 const SIMPLE_TRIGGERS: Record<string, string> = {
   ON_CLICK: "ON_CLICK",
   ON_HOVER: "ON_HOVER",
@@ -24,12 +29,12 @@ function trigger(event: any): Rest.Trigger | null {
   const type = event?.interactionType;
   if (!type) return null;
   if (SIMPLE_TRIGGERS[type]) return { type: SIMPLE_TRIGGERS[type] } as Rest.Trigger;
-  if (MOUSE_TRIGGERS[type]) return { type: MOUSE_TRIGGERS[type], delay: event.interactionDuration ?? 0 } as Rest.Trigger;
-  if (type === "AFTER_TIMEOUT") return { type: "AFTER_TIMEOUT", timeout: event.transitionTimeout ?? 0 };
+  if (MOUSE_TRIGGERS[type]) return { type: MOUSE_TRIGGERS[type], delay: ms(event.interactionDuration) } as Rest.Trigger;
+  if (type === "AFTER_TIMEOUT") return { type: "AFTER_TIMEOUT", timeout: ms(event.transitionTimeout) };
   if (type === "ON_KEY_DOWN") {
     return { type: "ON_KEY_DOWN", device: event.keyTrigger?.triggerDevice ?? "KEYBOARD", keyCodes: event.keyTrigger?.keyCodes ?? [] };
   }
-  if (type === "ON_MEDIA_HIT") return { type: "ON_MEDIA_HIT", mediaHitTime: event.mediaHitTime ?? 0 };
+  if (type === "ON_MEDIA_HIT") return { type: "ON_MEDIA_HIT", mediaHitTime: ms(event.mediaHitTime) };
   return null;
 }
 
@@ -73,7 +78,7 @@ const OPPOSITE = { LEFT: "RIGHT", RIGHT: "LEFT", TOP: "BOTTOM", BOTTOM: "TOP" } 
 function transition(a: any): Rest.Transition | null {
   const t: string | undefined = a.transitionType;
   if (!t || t === "INSTANT_TRANSITION") return null;
-  const duration = a.transitionDuration ?? 0.3;
+  const duration = ms(a.transitionDuration, 0.3);
   if (t === "DISSOLVE" || t === "SMART_ANIMATE" || t === "SCROLL_ANIMATE") return { type: t, duration, easing: easing(a) };
   const m = /^(MOVE|PUSH|SLIDE)_(FROM|OUT_TO)_(LEFT|RIGHT|TOP|BOTTOM)$/.exec(t);
   if (!m) return { type: "DISSOLVE", duration, easing: easing(a) };

@@ -14,6 +14,7 @@ import {
   parseVectorNetworkBlob,
   resolveVectorNodePaths,
 } from "./index.js";
+import { formatG } from "./vector.js";
 
 const fixturesDir = join(__dirname, "..", "test-fixtures");
 
@@ -517,6 +518,21 @@ describe("encodeVectorNetwork", () => {
     for (let i = 0; i < ns; i++) {
       expect(view.getUint32(12 + nv * 12 + i * 28, true), `segment ${i} word0`).toBe(0);
     }
+  });
+});
+
+describe("formatG", () => {
+  it("writes numbers as C's %g does, the format of REST paths", () => {
+    expect([6.6503906, 0.00021095538, 13.299805, 5.654182e-5, 1234567.5, 100, -0.5, 0].map((v) => formatG(v, 6)))
+      .toEqual(["6.65039", "0.000210955", "13.2998", "5.65418e-05", "1.23457e+06", "100", "-0.5", "0"]);
+    // An exact tie rounds to even, as printf does.
+    expect(formatG(0.009765625, 6)).toBe("0.00976562");
+    expect(formatG(0.029296875, 6)).toBe("0.0292969");
+  });
+
+  it("is used by geometryBlobToSVGPath with significantDigits", () => {
+    const blob = encodeCommandsBlob([{ type: "M", x: 1 / 3, y: 0 }, { type: "L", x: 2, y: 2 / 3 }]);
+    expect(geometryBlobToSVGPath(blob, { significantDigits: 6 })).toBe("M0.333333 0L2 0.666667");
   });
 });
 
