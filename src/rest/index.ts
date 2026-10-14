@@ -316,6 +316,27 @@ function geometry(ctx: Ctx, list: any[] | undefined): Rest.Path[] {
   return out;
 }
 
+/** The `inherit*StyleID` fields older files (format versions up to 30) use instead. */
+const LEGACY_STYLE_FIELDS: Record<string, string> = {
+  styleIdForFill: "inheritFillStyleID",
+  styleIdForStrokeFill: "inheritFillStyleIDForStroke",
+  styleIdForEffect: "inheritEffectStyleID",
+  styleIdForGrid: "inheritGridStyleID",
+};
+
+/**
+ * The style reference in `field` of a node, or the older field it replaced
+ * when that names a style in the file. Figma draws with the style's values, as
+ * it lays text out with them (see `textStyleRef`), whatever copies the node
+ * keeps.
+ */
+function styleRef(ctx: Ctx, n: any, field: string): any {
+  if (n[field]) return n[field];
+  const guid = n[LEGACY_STYLE_FIELDS[field]];
+  if (!guid || isSentinel(guid)) return undefined;
+  return (ctx.doc.nodeMap.get(guidString(guid)) as any)?.styleType ? { guid } : undefined;
+}
+
 /** The style node a `styleIdFor*` reference names, if it is in the file. */
 function styleNode(ctx: Ctx, ref: any): FigNode | undefined {
   if (ref?.guid) return isSentinel(ref.guid) ? undefined : ctx.doc.nodeMap.get(guidString(ref.guid));
@@ -333,11 +354,11 @@ function styleId(ctx: Ctx, ref: any): string | undefined {
 function styles(ctx: Ctx, n: any, type: string): Record<string, string> | undefined {
   const out: Record<string, string> = {};
   const set = (k: string, ref: any) => { const id = styleId(ctx, ref); if (id) out[k] = id; };
-  set("fill", n.styleIdForFill);
-  set("stroke", n.styleIdForStrokeFill);
+  set("fill", styleRef(ctx, n, "styleIdForFill"));
+  set("stroke", styleRef(ctx, n, "styleIdForStrokeFill"));
   set("text", textStyleRef(n));
-  set("effect", n.styleIdForEffect);
-  set("grid", n.styleIdForGrid);
+  set("effect", styleRef(ctx, n, "styleIdForEffect"));
+  set("grid", styleRef(ctx, n, "styleIdForGrid"));
   // Frames list fill and stroke styles under both names.
   if (FRAME_LIKE.has(type)) {
     if (out.fill) out.fills = out.fill;
@@ -786,9 +807,9 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     out.isMask = true;
     out.maskType = n.maskType === "OUTLINE" ? "VECTOR" : n.maskType === "LUMINANCE" ? "LUMINANCE" : "ALPHA";
   }
-  const fillStyle = styleNode(ctx, n.styleIdForFill);
-  const strokeStyle = styleNode(ctx, n.styleIdForStrokeFill);
-  const effectStyle = styleNode(ctx, n.styleIdForEffect);
+  const fillStyle = styleNode(ctx, styleRef(ctx, n, "styleIdForFill"));
+  const strokeStyle = styleNode(ctx, styleRef(ctx, n, "styleIdForStrokeFill"));
+  const effectStyle = styleNode(ctx, styleRef(ctx, n, "styleIdForEffect"));
   const fills = paints((fillStyle as any)?.fillPaints ?? n.fillPaints, resolve);
   if (FRAME_LIKE.has(type)) {
     out.clipsContent = type === "GROUP" ? false : n.frameMaskDisabled !== true;

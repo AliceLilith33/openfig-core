@@ -80,6 +80,17 @@ is edited. (Exception: text inside a scaled instance keeps its own, scaled,
 values and drops the style reference.) Frames list `fill`/`stroke` style ids
 under `fills`/`strokes` as well.
 
+**Older files.** Files saved with format version 30 or earlier (the number
+after `fig-kiwi` in the header) name styles by `inheritFillStyleID`,
+`inheritFillStyleIDForStroke`, `inheritEffectStyleID`, `inheritGridStyleID`
+and `inheritTextStyleID`; from version 35 on, files use `styleIdFor*`, and no
+file of the 182 in the corpus mixes the two. They are read as the newer
+fields when they name a style node. Figma lays out such text with the style's
+values (40 of 41 texts whose cached layout tells; none with the node's copy),
+and where a file's thumbnail is large enough to tell, it shows the style's
+colour (4 of 14 nodes sampled; the other 10 match neither, the thumbnail
+being older or too coarse).
+
 **Variables.** A bound colour shows the variable's value in the mode in force
 at the node: `variableModeBySetMap` on the node or the nearest node above it in
 the expanded tree. Variable ids are `VariableID:s:l` for local variables and

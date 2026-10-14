@@ -173,6 +173,8 @@ the kept component definitions. `openfig-web ir --screen` writes this.
   differ from the node's.
 - A text that uses a text style shows the style's values, also in older files
   that name it by `inheritTextStyleID` and keep stale copies on the node.
+  Fill, stroke and effect styles named by the older `inherit*StyleID` fields
+  are read the same way (see openfig-core's docs/rest.md).
 
 ### Paints and effects
 

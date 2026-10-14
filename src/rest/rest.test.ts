@@ -111,6 +111,31 @@ describe("toRestDocument", () => {
     expect(text.styles).toEqual({ text: "1:51" });
   });
 
+  it("reads the fill, stroke and effect styles of older files from their inherit fields", () => {
+    const red = [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 }, opacity: 1, visible: true }];
+    const blue = [{ type: "SOLID", color: { r: 0, g: 0, b: 1, a: 1 }, opacity: 1, visible: true }];
+    const shadow = [{ type: "DROP_SHADOW", color: { r: 0, g: 0, b: 0, a: 0.5 }, offset: { x: 0, y: 2 }, radius: 4, visible: true }];
+    const doc = docOf([
+      { id: 51, parent: 100, type: "RECTANGLE", styleType: "FILL", name: "Red", fillPaints: red } as any,
+      { id: 52, parent: 100, type: "RECTANGLE", styleType: "EFFECT", name: "Shadow", effects: shadow } as any,
+      { id: 53, parent: 100, type: "VECTOR", name: "not a style", fillPaints: red } as any,
+      {
+        id: 1, parent: 100, type: "RECTANGLE", fillPaints: blue, strokePaints: blue,
+        inheritFillStyleID: G(51), inheritFillStyleIDForStroke: G(51), inheritEffectStyleID: G(52),
+      } as any,
+      { id: 2, parent: 100, type: "RECTANGLE", fillPaints: blue, inheritFillStyleID: G(53) } as any,
+    ]);
+    const rest = index(toRestDocument(doc).document);
+    const rect = rest.get("1:1");
+    expect(rect.fills[0].color).toMatchObject({ r: 1, g: 0, b: 0 });
+    expect(rect.strokes[0].color).toMatchObject({ r: 1, g: 0, b: 0 });
+    expect(rect.effects[0]).toMatchObject({ type: "DROP_SHADOW", radius: 4 });
+    expect(rect.styles).toEqual({ fill: "1:51", stroke: "1:51", effect: "1:52" });
+    // A field naming a node that is not a style is ignored.
+    expect(rest.get("1:2").fills[0].color).toMatchObject({ r: 0, g: 0, b: 1 });
+    expect(rest.get("1:2").styles).toBeUndefined();
+  });
+
   it("expands instances with REST's sublayer ids and lists overrides per instance", () => {
     // Card (symbol 10): title TEXT (key K1) and a nested Badge instance (key K2)
     // of symbol 20, whose label TEXT has key K3.
