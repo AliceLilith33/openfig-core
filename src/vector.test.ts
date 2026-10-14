@@ -326,6 +326,19 @@ describe("parseVectorNetworkBlob", () => {
     expect(network.segments[0].isStraight).toBe(false);
   });
 
+  it("keeps the segment styleID and writes it back", () => {
+    // Segment leading word 3 = styleOverrideTable entry 3 (e.g. a strokeCap override).
+    const blob = buildBlob([
+      2, 1, 0, // header
+      0, 0, 0, // vertex 0
+      0, 0, 0, // vertex 1
+      3, 0, 0, 0, 1, 0, 0, // segment: styleID=3, sv=0, ev=1, straight
+    ]);
+    const network = parseVectorNetworkBlob(blob);
+    expect(network.segments[0].styleID).toBe(3);
+    expect(Buffer.from(encodeVectorNetwork(network)).equals(Buffer.from(blob))).toBe(true);
+  });
+
   it("throws on a buffer shorter than the 12-byte header", () => {
     expect(() => parseVectorNetworkBlob(buildBlob([0]))).toThrow(/at least 12/);
   });

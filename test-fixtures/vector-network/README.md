@@ -32,7 +32,7 @@ on filled shapes. A corpus lacking either kind will validate a wrong decoder. Th
 ```
 [vertexCount u32][segmentCount u32][regionCount u32]      12-byte header
 vertex  x nv   12B: [word0 u32][x f32][y f32]
-segment x ns   28B: [word0 u32][startVertex u32][tsx f32][tsy f32]
+segment x ns   28B: [styleID u32][startVertex u32][tsx f32][tsy f32]
                     [endVertex u32][tex f32][tey f32]
 region  x nr      : [styleID<<1|windingRule u32][numLoops u32]
                     per loop: [segCount u32][segIndex u32 x segCount]
@@ -41,7 +41,7 @@ region  x nr      : [styleID<<1|windingRule u32][numLoops u32]
 Byte-exact on all 43 blobs across these six files plus `../OpenFigs.fig` and `../circle.fig` — 26,391 vertices and 26,491 segments in total.
 
 - A segment is a **straight line iff all four tangent components are zero**. No field encodes
-  segment type: `word0` is `0` on curved and straight segments alike.
+  segment type: the leading word is `0` on curved and straight segments alike here.
 - The vertex leading word is a **`styleID`** — an index into the node's
   `vectorData.styleOverrideTable`, where `0` means "no override". It is **not** always
   `0`: across these fixtures it is `0` on 385 vertices and `1` on 13, all in
@@ -57,12 +57,10 @@ Byte-exact on all 43 blobs across these six files plus `../OpenFigs.fig` and `..
   Corroborating: entries elsewhere carry six properties, which cannot fit in one
   u32, and the Kiwi schema gives `VectorData` a `styleOverrideTable` of `NodeChange`
   keyed by `styleID` with no other array for per-vertex references.
-- The segment leading word is structurally the same slot and is presumed to be a
-  `styleID` too, but it is `0` on all 26,493 segments here and on every segment of every
-  reference file checked so far, so nothing confirms what a segment-scoped override
-  would contain. Figma's public plugin API exposes style properties on `VectorVertex`
-  and `VectorRegion` but none on `VectorSegment`, so the slot may be editor-only or
-  reserved. Treat it as unidentified; write `0`.
+- The segment leading word is a `styleID` too. It is `0` on all 26,493 segments here,
+  but in a corpus of 181 public Figma files 4.2M of 8.6M segments carry 1–6, and every
+  value names an existing `styleOverrideTable` entry (strokeCap, strokeJoin,
+  cornerRadius, handleMirroring, cornerSmoothing). Preserve it verbatim.
 - The region `packed` word is `1` throughout, i.e. `styleID = 0`, `windingRule = NONZERO`.
 - `commandsBlob` and the vector network describe the same geometry but do not always use
   the same number of commands: `coloradjusted.fig`'s "Blockbuster" has 997 commands against

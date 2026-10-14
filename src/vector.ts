@@ -638,8 +638,8 @@ export interface VectorNetworkVertex {
   /**
    * The vertex's leading u32 — an index into the node's
    * `vectorData.styleOverrideTable`, where 0 means "no override". Observed
-   * values are 0 and 1 across the reference corpus (openfig once wrote 4 here,
-   * which Figma never emits).
+   * values are 0 and 1 across the reference corpus and small integers in public
+   * files (openfig once wrote 4 here without a matching table entry).
    *
    * This was previously named `handleMirroring`, because the one fixture with a
    * non-zero value has a single override entry `{styleID: 1, handleMirroring:
@@ -660,6 +660,15 @@ export interface VectorNetworkSegment {
   start: { vertex: number; dx: number; dy: number };
   end: { vertex: number; dx: number; dy: number };
   isStraight: boolean;
+  /**
+   * The segment's leading u32 — like the vertex's, an index into
+   * `vectorData.styleOverrideTable`, 0 meaning "no override". Across 8.6M
+   * segments in 181 public files, every non-zero value (1–6) names an existing
+   * table entry, typically carrying strokeCap, strokeJoin, cornerRadius or
+   * handleMirroring. The parser always sets it; when building a network by hand
+   * it may be omitted and is written as 0.
+   */
+  styleID?: number;
 }
 
 export interface VectorNetworkRegion {
@@ -683,7 +692,7 @@ export interface VectorNetwork {
  * Verified byte-exact layout (little-endian):
  *   header   12B : [vertexCount u32][segmentCount u32][regionCount u32]
  *   vertex   12B : [styleID u32][x f32][y f32]
- *   segment  28B : [word0 u32][startVertex u32][tsx f32][tsy f32]
+ *   segment  28B : [styleID u32][startVertex u32][tsx f32][tsy f32]
  *                   [endVertex u32][tex f32][tey f32]
  *   region        : [packed u32][numLoops u32]
  *                   per loop: [segCount u32][segIndex u32 × segCount]
@@ -691,11 +700,10 @@ export interface VectorNetwork {
  * `packed` decodes as windingRule = (packed & 1) ? "NONZERO" : "ODD",
  * styleID = packed >> 1.
  *
- * The vertex's leading word is Figma's handle-mirroring mode (observed 0 and 1);
- * it is preserved verbatim for byte-identical re-encoding. The segment's leading
- * word is 0 throughout the reference corpus and its meaning is unknown — it is
- * never used. A segment is straight iff all four tangent components are zero;
- * there is no segment-type field.
+ * The vertex and segment leading words are `styleOverrideTable` indices (0 = no
+ * override); both are preserved verbatim for byte-identical re-encoding. A
+ * segment is straight iff all four tangent components are zero; there is no
+ * segment-type field.
  */
 export function parseVectorNetworkBlob(bytes: Uint8Array): VectorNetwork {
   if (bytes.length < 12) {
@@ -734,7 +742,7 @@ export function parseVectorNetworkBlob(bytes: Uint8Array): VectorNetwork {
   const segments: VectorNetworkSegment[] = [];
   for (let i = 0; i < segmentCount; i++) {
     const segmentOffset = offset;
-    offset += 4; // word0 — meaning unknown, unused
+    const styleID = view.getUint32(offset, true); offset += 4;
     const startVertex = view.getUint32(offset, true); offset += 4;
     const tsx = view.getFloat32(offset, true); offset += 4;
     const tsy = view.getFloat32(offset, true); offset += 4;
@@ -755,6 +763,7 @@ export function parseVectorNetworkBlob(bytes: Uint8Array): VectorNetwork {
       start: { vertex: startVertex, dx: tsx, dy: tsy },
       end: { vertex: endVertex, dx: tex, dy: tey },
       isStraight: tsx === 0 && tsy === 0 && tex === 0 && tey === 0,
+      styleID,
     });
   }
 
@@ -814,11 +823,11 @@ export type VectorNetworkInput = Pick<VectorNetwork, "vertices" | "segments" | "
  * Encode structured vector-network geometry into a Figma `vectorNetworkBlob`.
  *
  * Emits the exact layout `parseVectorNetworkBlob` reads (which see for the field
- * table): 12-byte header; vertex `[styleID, x, y]`; segment `[word0,
+ * table): 12-byte header; vertex `[styleID, x, y]`; segment `[styleID,
  * startVertex, tsx, tsy, endVertex, tex, tey]`; region `[styleID<<1|windingRule,
- * numLoops, (segCount, indices)×numLoops]`. The vertex handle-mirroring word is
- * written back as parsed; the segment word0 is written as 0, the only value
- * observed in reference output. A reference blob decoded and re-encoded
+ * numLoops, (segCount, indices)×numLoops]`. Vertex and segment styleIDs are
+ * written back as parsed (a segment without one is written as 0). A reference
+ * blob decoded and re-encoded
  * here comes back byte-for-byte identical — the acceptance criterion verified by
  * the corpus round-trip test.
  */
@@ -846,7 +855,7 @@ export function encodeVectorNetwork(network: VectorNetworkInput): Uint8Array {
   }
 
   for (const segment of network.segments) {
-    view.setUint32(offset, 0, true); offset += 4; // word0 — 0 throughout Figma output
+    view.setUint32(offset, segment.styleID ?? 0, true); offset += 4;
     view.setUint32(offset, segment.start.vertex, true); offset += 4;
     view.setFloat32(offset, segment.start.dx, true); offset += 4;
     view.setFloat32(offset, segment.start.dy, true); offset += 4;

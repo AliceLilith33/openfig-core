@@ -80,7 +80,7 @@ The layout below is verified byte-exact on the reference reference corpus
 ```
 header   12B : vertexCount(u32)  segmentCount(u32)  regionCount(u32)
 vertex   12B : styleID(u32)  x(f32)  y(f32)
-segment  28B : word0(u32)  startVertex(u32)  tangentStartX(f32)  tangentStartY(f32)
+segment  28B : styleID(u32)  startVertex(u32)  tangentStartX(f32)  tangentStartY(f32)
               endVertex(u32)  tangentEndX(f32)  tangentEndY(f32)
 region       : packed(u32)  numLoops(u32)
                per loop: segCount(u32)  segIndex(u32) × segCount
@@ -100,11 +100,13 @@ region       : packed(u32)  numLoops(u32)
   indistinguishable while the only non-zero value seen was `1` and
   `VectorMirror.ANGLE` is also `1`. Under that reading `2` would be
   `ANGLE_AND_LENGTH`, which is not what was set.
-- The segment's leading word is structurally the same slot and presumably also a
-  `styleID`, but it is `0` on all 26,493 reference segments, so nothing shows what
-  a segment-scoped override would hold. Figma's plugin API exposes style properties
-  on `VectorVertex` and `VectorRegion` and none on `VectorSegment`, so the slot may
-  be unreachable from the editor. Treat it as unidentified; write `0`.
+- The segment's leading word is a `styleID` as well. It is `0` on all 26,493
+  reference segments, but across 181 public Figma files it is non-zero on 4.2M of
+  8.6M segments (values 1–6), and every one of those names an existing
+  `styleOverrideTable` entry — typically `strokeCap`, `strokeJoin`,
+  `cornerRadius`, `handleMirroring` or `cornerSmoothing`. It is exposed as
+  `segment.styleID` and written back verbatim; writing `0` instead loses those
+  per-segment overrides.
 
 ### Curve classification
 
@@ -127,8 +129,8 @@ reference reference blob **byte-for-byte (43/43)**. That round-trip is the
 acceptance criterion the format is held to: it requires no theory of what each
 field means, only that we put back what we found. Newly authored geometry
 (`encodeVectorNetworkBlob`) confines every emitted value to Figma's observed
-domain — in particular the segment `word0` is `0`, never the `4` openfig once
-wrote, which appears nowhere in Figma output and was a one-scan fingerprint.
+domain — in particular the segment `styleID` is `0`, never the dangling `4`
+openfig once wrote.
 
 ## Per-path fills
 
@@ -266,8 +268,7 @@ Encodes parsed path commands into a `commandsBlob` byte stream suitable for
 
 Builds a minimal `vectorNetworkBlob` from path commands in normalized-space
 coordinates. Emits Figma's verified layout (see above); authored vertices use
-handle-mirroring `0` and segment `word0` `0`, both within Figma's observed
-domain.
+vertex and segment `styleID` `0` (no override).
 
 ### `encodeVectorNetwork(network)`
 
