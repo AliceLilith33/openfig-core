@@ -23,6 +23,7 @@ export {
   explicitModes,
   resolveVariable,
   resolveVariableData,
+  resolvePaint,
   resolvePaintColor,
   resolveBoundVariables,
 } from "./variables.js";
@@ -47,7 +48,7 @@ export type { EncodedFigParts, AssembleCanvasFigInput, CreateFigZipInput } from 
 export type { ConvertOptions } from "./convert.js";
 export type { WalkOptions, WalkVisitor, FigRect } from "./tree.js";
 export type { ResolvedNode, ResolveOptions } from "./instance.js";
-export type { FigVariableRef, ResolveVariableOptions, ResolvedVariableValue } from "./variables.js";
+export type { FigVariableRef, ResolveVariableOptions, ResolvedPaint, ResolvedVariableValue } from "./variables.js";
 export type {
   GradientFillLike,
   GradientKind,

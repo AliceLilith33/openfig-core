@@ -7,6 +7,7 @@ import {
   nodeId,
   parseFig,
   resolveBoundVariables,
+  resolvePaint,
   resolvePaintColor,
   resolveVariable,
   resolveVariableData,
@@ -95,6 +96,23 @@ describe("variables", () => {
     expect(resolvePaintColor(doc, { type: "SOLID", color: cached, colorVar: alias(G(99)) })).toBe(cached);
     expect(resolvePaintColor(doc, { type: "SOLID", color: cached, colorVar: alias(G(2)) })).toMatchObject({ r: 0.1 });
   });
+
+  it("moves a bound variable's alpha into the paint's opacity, as Figma caches it", () => {
+    const list: any[] = nodes();
+    list[1].variableDataValues.entries[0].variableData.value.colorValue.a = 0.5;
+    const doc = docOf(list);
+    // Figma stores this paint as color.a = 1, opacity = 0.5; drawing color.a * opacity must give 0.5, not 0.25.
+    const paint = { type: "SOLID", color: { r: 0.1, g: 0, b: 0, a: 1 }, opacity: 0.5, colorVar: alias(G(2)) };
+    expect(resolvePaint(doc, paint)).toEqual({ color: { r: 0.1, g: 0, b: 0, a: 1 }, opacity: 0.5 });
+    // Another mode's alpha replaces the cached opacity rather than multiplying it.
+    expect(resolvePaint(doc, { ...paint, opacity: 0.2 }).opacity).toBe(0.5);
+  });
+
+  it("treats a literal colorVar as no binding", () => {
+    const doc = docOf(nodes());
+    const paint = { type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3, a: 1 }, opacity: 0.8, colorVar: color(0.31) };
+    expect(resolvePaint(doc, paint)).toEqual({ color: paint.color, opacity: 0.8 });
+  });
 });
 
 describe("variables on a reference file", () => {
@@ -109,6 +127,8 @@ describe("variables on a reference file", () => {
         expect(resolved?.type, node.name).toBe("COLOR");
         const c = resolved!.value as any;
         for (const k of ["r", "g", "b", "a"]) expect(c[k], `${node.name} ${k}`).toBeCloseTo(paint.color[k], 6);
+        const { color: drawn, opacity } = resolvePaint(doc, paint, { node });
+        expect(drawn!.a * opacity, node.name).toBeCloseTo(paint.color.a * (paint.opacity ?? 1), 6);
         checked++;
       }
     }
