@@ -298,6 +298,73 @@ describe("toDesignIR", () => {
     }]);
   });
 
+  it("marks clickable nodes, repeated instances and the variants that are states", () => {
+    const change = (trigger: string, to: string) => [{ trigger: { type: trigger }, actions: [{ type: "NODE", destinationId: to, navigation: "CHANGE_TO" }] }];
+    const text = (id: string, characters: string) => node(id, "TEXT", { name: "Label", characters, style: {} });
+    const item = (id: string, variant: string, label: string) => node(id, "INSTANCE", {
+      componentId: variant === "Default" ? "2:2" : "2:3",
+      componentProperties: { State: { type: "VARIANT", value: variant } },
+      children: [text(`I${id};2:4`, label)],
+    });
+    const ir = toDesignIR(file([
+      node("2:1", "COMPONENT_SET", {
+        name: "Nav button",
+        componentPropertyDefinitions: { State: { type: "VARIANT", defaultValue: "Default", variantOptions: ["Default", "Hovered", "Disabled", "Active"] } },
+        children: [
+          node("2:2", "COMPONENT", { name: "State=Default", interactions: change("ON_HOVER", "2:3"), children: [text("2:4", "Item")] }),
+          node("2:3", "COMPONENT", { name: "State=Hovered", interactions: change("ON_CLICK", "2:5") }),
+          node("2:5", "COMPONENT", { name: "State=Disabled" }),
+          node("2:6", "COMPONENT", { name: "State=Active" }),
+        ],
+      }),
+      node("2:9", "COMPONENT", { name: "Button Group" }),
+      node("1:1", "FRAME", { layoutMode: "VERTICAL", children: [
+        item("1:2", "Default", "Home"),
+        item("1:3", "Hovered", "About"),
+        item("1:4", "Default", "Blog"),
+        node("1:5", "TEXT", { characters: "Docs", style: { hyperlink: { type: "URL", url: "https://example.com" } } }),
+        node("1:6", "INSTANCE", { componentId: "2:9" }),
+        node("1:7", "INSTANCE", { componentId: "2:9" }),
+        node("1:8", "INSTANCE", { componentId: "2:9", layoutPositioning: "ABSOLUTE" }),
+        node("1:9", "RECTANGLE", { interactions: [{ trigger: { type: "ON_CLICK" }, actions: [{ type: "BACK" }] }] }),
+      ] }),
+      // Not laid out: no list is read from the order of its children.
+      node("1:20", "FRAME", { children: [item("1:21", "Default", "A"), item("1:22", "Default", "B")] }),
+    ], {
+      components: {
+        "2:2": { key: "", name: "State=Default", description: "", remote: false, componentSetId: "2:1", documentationLinks: [] },
+        "2:3": { key: "", name: "State=Hovered", description: "", remote: false, componentSetId: "2:1", documentationLinks: [] },
+        "2:9": { key: "", name: "Button Group", description: "", remote: false, documentationLinks: [] },
+      } as any,
+      componentSets: { "2:1": { key: "", name: "Nav button", description: "", documentationLinks: [] } } as any,
+    }));
+    const n = index(ir);
+    expect(n.get("1:1")!.repeats).toEqual([
+      { component: "2:1", name: "Nav button", items: ["1:2", "1:3", "1:4"], props: ["State"], texts: ["Label"] },
+      { component: "2:9", name: "Button Group", items: ["1:6", "1:7"] },
+    ]);
+    expect(n.get("1:20")).not.toHaveProperty("repeats");
+    // The name says button; the Hovered variant's definition has a click.
+    expect(n.get("1:2")!.clickable).toEqual({ name: { word: "button", in: "Nav button" } });
+    expect(n.get("1:3")!.clickable).toEqual({ component: true, name: { word: "button", in: "Nav button" } });
+    expect(n.get("1:5")!.clickable).toEqual({ link: true });
+    expect(n.get("1:6")).not.toHaveProperty("clickable");
+    expect(n.get("1:9")!.clickable).toEqual({ interaction: true });
+    expect(n.get("2:3")!.clickable).toEqual({ interaction: true });
+    expect(ir.components["2:1"].stateProps).toEqual({
+      State: {
+        Default: { state: "default", variants: ["2:2"] },
+        Hovered: { state: "hover", variants: ["2:3"], prototype: ["hover"] },
+        Disabled: { state: "disabled", variants: ["2:5"], prototype: ["click"] },
+        Active: { variants: ["2:6"] },
+      },
+    });
+    // Kept in one screen's IR.
+    const one = screenIR(ir, "1:1");
+    expect(index(one).get("1:1")!.repeats).toHaveLength(2);
+    expect(one.components["2:1"].stateProps).toBeDefined();
+  });
+
   it("draws vector-only layers as shared SVG artwork", () => {
     const path = (d: string) => [{ path: d, windingRule: "NONZERO" }];
     const icon = (id: string, x: number) => node(id, "FRAME", {

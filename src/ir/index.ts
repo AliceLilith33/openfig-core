@@ -9,6 +9,7 @@ import { toRestVariables, type RestVariables } from "../rest/variables.js";
 import { blendMode, hex, irEffects, irPaints, irStroke, round, type TokenOf } from "./paint.js";
 import { hasGeometry, nodeSvg } from "./svg.js";
 import { imageInfo } from "./image.js";
+import { addIntent } from "./intent.js";
 import type {
   DesignIR, IRAction, IRAssets, IRComponent, IRComponentProp, IRConstraint, IRFlexLayout, IRGridLayout,
   IRInteraction, IRNode, IRNodeType, IRPage, IRPadding, IRScreen, IRStyle, IRText, IRTextRun, IRTextStyle,
@@ -856,7 +857,9 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
   }
 
   ctx.assets.fonts = [...ctx.fonts.values()].sort((a, b) => b.nodes - a.nodes);
-  return { version: 1, name: file.name ?? "", pages, components: ctx.components, tokens, styles: ctx.styles, assets: ctx.assets };
+  const ir: DesignIR = { version: 1, name: file.name ?? "", pages, components: ctx.components, tokens, styles: ctx.styles, assets: ctx.assets };
+  addIntent(ir);
+  return ir;
 }
 
 /** The design IR of a parsed .fig file: `toDesignIR` over its REST view, with geometry, variables and images. */

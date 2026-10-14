@@ -147,6 +147,10 @@ export interface IRNode {
   modes?: Record<string, string>;
 
   interactions?: IRInteraction[];
+  /** Why a front end should make this node clickable; each field is one sign. Absent: no sign. */
+  clickable?: IRClickable;
+  /** For an auto-layout container: runs of instances of one component among its children, a repeated list. */
+  repeats?: IRRepeat[];
   /**
    * The key into `assets.svgs` the node is drawn from; its children are left
    * out. Set on `svg` nodes, and on instances and components of icons.
@@ -156,6 +160,33 @@ export interface IRNode {
   exports?: Array<{ format: string; suffix?: string; scale?: number }>;
 
   children?: IRNode[];
+}
+
+export interface IRClickable {
+  /** The node has a click or press interaction of its own (see `interactions`). */
+  interaction?: true;
+  /** For an instance: the definition of its component (or variant) has a click or press interaction. */
+  component?: true;
+  /** For a text: the whole text is a link (see `text.link`). */
+  link?: true;
+  /**
+   * For an instance: the name of its component set, or of its component when
+   * it is not a variant, has the word `button` (or `btn`) or `link`. Left out
+   * when an ancestor is already clickable.
+   */
+  name?: { word: "button" | "link"; in: string };
+}
+
+export interface IRRepeat {
+  /** The component set for variants, else the component: what `component.set ?? component.id` gives. */
+  component: string;
+  name: string;
+  /** The instances, in order: two or more consecutive children of the container, in its flow. */
+  items: string[];
+  /** Component properties, variant ones included, whose values differ between the items. */
+  props?: string[];
+  /** Text layers whose content differs between the items, by layer name: the data each item shows. */
+  texts?: string[];
 }
 
 export type IRConstraint = "start" | "end" | "both" | "center" | "scale";
@@ -347,8 +378,24 @@ export interface IRComponent {
    * `:hover`, `:active` and toggled state.
    */
   states?: Record<string, { hover?: string; press?: string; click?: string; focus?: string }>;
+  /**
+   * For a set: the variant properties that hold interaction states — those
+   * with a value naming hover, press, focus or disabled — by property name,
+   * then by value: what the value means (`state`, when it is a known state
+   * name), the variants that have it, and the prototype triggers in `states`
+   * that lead to one of them.
+   */
+  stateProps?: Record<string, Record<string, IRStateValue>>;
   /** The definition: the component, or the set with its variants as children. */
   root?: IRNode;
+}
+
+export interface IRStateValue {
+  state?: "default" | "hover" | "press" | "focus" | "disabled";
+  /** Variant ids. */
+  variants: string[];
+  /** Prototype triggers that change another variant of the set to one of these. */
+  prototype?: Array<"hover" | "press" | "click" | "focus">;
 }
 
 export interface IRComponentProp {

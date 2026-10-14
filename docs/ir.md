@@ -81,6 +81,42 @@ page:
   `states[variant].hover`; "while pressing" and "mouse down" give `press`, and
   "on click" gives `click`. A front end maps them to `:hover`, `:active` and a
   toggled state.
+- **State variants.** A set's variant property is listed in `stateProps` when
+  one of its values names hover, press, focus or disabled. Every value of it
+  is listed with the variants that have it, its meaning in `state` when the
+  value's words say it (case-insensitive; `default`, `enabled`, `normal`,
+  `rest`, `idle` → `default`; `hover`, `hovered` → `hover`; `pressed`,
+  `pressing` → `press`; `focus`, `focused` → `focus`; `disabled` →
+  `disabled`, which wins in a value like "Disabled Checked"), and in
+  `prototype` the triggers of `states` that change another variant to one of
+  them. Values that say nothing certain — `Active` (pressed, or the current
+  page?), `Selected`, `Checked`, `Error` — are listed without `state`. The
+  variant for the hover of `Size=L, State=Default` is the one with
+  `State=Hover` and the same other values.
+- **Clickable.** `clickable` lists each sign that a node is clickable, so a
+  front end can choose a `<button>` or an `<a>` and see why:
+  `interaction` — a click, while-pressing, mouse-down or mouse-up
+  interaction on the node (hover alone does not count); `component` — the
+  definition of an instance's component or variant has one; `link` — the
+  whole text is a link; `name` — the name of the instance's component set
+  (or component, when not a variant) has the word `button`, `btn` or `link`,
+  with the word and the name. Plurals, names with `+` (`Field + button`), and
+  names with `group`, `section`, `icon`, `glyph`, `keyboard`, `field` or
+  `input` do not count, and `name` is left out inside a node that is already
+  clickable. Layer names, shapes and colours are not read: a rectangle and a
+  text drawn to look like a button, without an interaction, are not marked.
+- **Repeated lists.** In a container with auto layout (flex or grid), two or
+  more consecutive children that are instances of one component — of one set,
+  for variants — and not placed absolutely are a run in the container's
+  `repeats`: the component (or set) id and name, the item ids, the component
+  properties whose values differ between the items (`props`), and the names
+  of text layers whose content differs (`texts`), matched by their place in
+  the instance. These are the item's data; what is the same in all items is
+  the template. Instances placed by coordinates in a frame without auto
+  layout are not grouped, nor are siblings that share a layer structure
+  without being instances.
+- **Placeholder content.** Not marked: a .fig file holds no sign that a text
+  is sample content rather than the real copy.
 - **Artwork.** Vectors, boolean operations, stars and polygons, and frames,
   groups and instances that hold only vector shapes (at least one path, no
   text, images, effects, interactions or auto layout), are drawn as SVG:
@@ -147,7 +183,8 @@ the kept component definitions. `openfig-web ir --screen` writes this.
   frames), and a frame hugging across a row or column whose children all fill
   that axis. Likewise a child that fills along the axis its parent hugs keeps
   its stored size.
-- The IR has no marker for a repeated list. Siblings that are instances of the
+- `repeats` marks repeated lists in auto layout (see
+  [Intent the IR adds](#intent-the-ir-adds)). Elsewhere, siblings that are instances of the
   same component (`component.id`, or `component.set` for variants), or that
   share a layer structure, are the best sign of one.
 
@@ -223,7 +260,7 @@ covered above:
 | `styles`, `tokens`, `modes` | Shared styles, bound tokens by IR field, and variable modes set on the node. |
 | `exports` | The designer's export settings: `format`, `suffix`, `scale`. |
 | `component.overrides`, `component.scale` | Layers changed on the instance; a scaled instance's factor. |
-| `components[id]` | Also `remote` (from a library), `page`, `variants`, `states`; props' `preferred` are component keys. |
+| `components[id]` | Also `remote` (from a library), `page`, `variants`, `states`, `stateProps`; props' `preferred` are component keys. |
 | `tokens.tokens[name]` | `collection`, `type`, `css`, `values` by mode (`{ token }` for an alias), `scopes`, `description`. |
 | `assets` | `images` (`nodes`, `width`, `height`, `mime`), `svgs` (`name`, `width`, `height`, `svg`), `fonts` (`family`, `style`, `weight`, `italic`, `nodes`). |
 
@@ -246,6 +283,15 @@ when `OPENFIG_REST_PAIRS` is set.
 Over 179 public files (about 498,000 IR nodes), every file converts, every
 token, style, component and SVG a node refers to is defined, and the IR is
 about 40% of the size of the REST JSON with SVG artwork included.
+
+Over the same files' 8,016 screens: 2,932 `repeats` (10,046 items) in 1,414
+screens of 25 files; 3,506 `clickable` nodes in 874 screens of 53 files
+(2,261 by interaction, 1,279 by name, 263 by component, 23 by link); and
+`stateProps` on 349 of 1,057 sets defined in 10 files. Another 965 runs of
+instances sit in frames without auto layout and are not marked. A spot check
+of 30 `repeats` (from all 25 files), 35 `clickable` nodes and 50 `stateProps` found
+one questionable list (two different buttons side by side), one button that
+is a drawing of a device's hardware button, and no wrong `state`.
 
 ## Limits
 
