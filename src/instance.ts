@@ -87,9 +87,14 @@ function sameGuid(a: FigGuid | undefined, b: FigGuid | undefined): boolean {
   return !!a && !!b && a.sessionID === b.sessionID && a.localID === b.localID;
 }
 
-/** The key a guidPath segment uses for this node. */
+/**
+ * The key a guidPath segment uses for this node. An override key of all ones
+ * (0xFFFFFFFF:0xFFFFFFFF) is no key: overrides and derived data name such a
+ * node by its guid.
+ */
 export function overrideKeyOf(node: FigNode): FigGuid {
-  return node.overrideKey ?? node.guid;
+  const k = node.overrideKey;
+  return k && k.sessionID !== 0xffffffff ? k : node.guid;
 }
 
 function scoped(entries: any[] | undefined): Scoped[] {
@@ -114,8 +119,21 @@ const SCALED_FIELDS = new Set([
   "cornerRadius", "rectangleTopLeftCornerRadius", "rectangleTopRightCornerRadius",
   "rectangleBottomLeftCornerRadius", "rectangleBottomRightCornerRadius",
   "stackSpacing", "stackCounterSpacing", "stackHorizontalPadding", "stackVerticalPadding",
-  "stackPaddingRight", "stackPaddingBottom",
+  "stackPaddingRight", "stackPaddingBottom", "stackPaddingLeft", "stackPaddingTop",
 ]);
+
+/**
+ * How an instance lays out its own children. A swapped instance takes these
+ * from the symbol it now shows: the instance node still holds the old
+ * symbol's (a button group swapped from a row variant to a stacked one).
+ */
+const CONTAINER_LAYOUT_FIELDS = [
+  "stackMode", "stackSpacing", "stackPadding", "stackHorizontalPadding", "stackVerticalPadding",
+  "stackPaddingLeft", "stackPaddingTop", "stackPaddingRight", "stackPaddingBottom",
+  "stackPrimaryAlignItems", "stackCounterAlignItems", "stackReverseZIndex", "stackWrap",
+  "stackCounterSpacing", "stackCounterAlignContent", "bordersTakeSpace",
+  "gridRows", "gridColumns", "gridRowGap", "gridColumnGap", "gridRowsSizing", "gridColumnsSizing",
+];
 
 /** Copy every node property an override or derived entry carries onto `node`. */
 export function applyNodeChange(node: FigNode, change: Record<string, any>): void {
@@ -213,6 +231,12 @@ export function resolveTree(doc: FigDocument, node: FigNode, options: ResolveOpt
     for (const o of outerOverrides) if (o.data.overriddenSymbolID) symbolGuid = o.data.overriddenSymbolID;
     const symbol = symbolGuid ? doc.nodeMap.get(guidKey(symbolGuid)) : undefined;
     if (symbol && node.symbolData) node.symbolData.symbolID = deepClone(symbol.guid);
+    if (symbol && !sameGuid(symbolGuid, source.symbolData?.symbolID)) {
+      for (const f of CONTAINER_LAYOUT_FIELDS) {
+        if (symbol[f] === undefined) delete node[f];
+        else node[f] = deepClone(symbol[f]);
+      }
+    }
 
     // The scope inside: the instance's own entries, then the outer ones
     // addressed through it. Later entries win, so outer beats inner.

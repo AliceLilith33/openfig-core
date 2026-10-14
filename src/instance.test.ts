@@ -109,6 +109,33 @@ describe("resolveInstance", () => {
     expect(badge.children.map((c) => c.node.textData?.characters)).toEqual(["Swapped"]);
   });
 
+  it("lays a swapped instance out as the symbol it now shows", () => {
+    const doc = docOf([
+      ...base().map((n) => n.id === 12 ? { ...n, stackMode: "HORIZONTAL", stackSpacing: 16, stackPrimaryAlignItems: "MAX" } : n.id === 30 ? { ...n, stackMode: "VERTICAL", stackSpacing: 8 } : n),
+      { id: 1, type: "INSTANCE", symbolData: { symbolID: G(10), symbolOverrides: [override([K(2)], { overriddenSymbolID: G(30) })] } },
+      { id: 2, type: "INSTANCE", symbolData: { symbolID: G(10), symbolOverrides: [override([K(2)], { overriddenSymbolID: G(30), stackSpacing: 4 })] } },
+      { id: 3, type: "INSTANCE", symbolData: { symbolID: G(10) } },
+    ]);
+    const badge = (id: string) => resolveInstance(doc, doc.nodeMap.get(id)!).children[1].node;
+    expect(badge("1:1")).toMatchObject({ stackMode: "VERTICAL", stackSpacing: 8 });
+    expect(badge("1:1")).not.toHaveProperty("stackPrimaryAlignItems");
+    // An override for the swapped instance still wins.
+    expect(badge("1:2")).toMatchObject({ stackMode: "VERTICAL", stackSpacing: 4 });
+    // Not swapped: the instance keeps its own.
+    expect(badge("1:3")).toMatchObject({ stackMode: "HORIZONTAL", stackSpacing: 16 });
+  });
+
+  it("names a node whose override key is all ones by its guid", () => {
+    const none = { sessionID: 0xffffffff, localID: 0xffffffff };
+    const doc = docOf([
+      { id: 40, type: "SYMBOL", name: "Text" },
+      { id: 41, parent: 40, type: "TEXT", name: "label", overrideKey: none, textData: { characters: "Text" } },
+      { id: 1, type: "INSTANCE", symbolData: { symbolID: G(40) }, derivedSymbolData: [override([G(41)], { size: { x: 74, y: 22 } })] },
+    ]);
+    expect(overrideKeyOf(doc.nodeMap.get("1:41")!)).toEqual(G(41));
+    expect(resolveInstance(doc, doc.nodeMap.get("1:1")!).children[0].node.size).toEqual({ x: 74, y: 22 });
+  });
+
   it("lets outer overrides win over the nested instance's own", () => {
     const doc = docOf([
       ...base().map((n) => n.id === 12

@@ -169,8 +169,10 @@ const OVERRIDE_FIELDS: Record<string, string[]> = {
   stackPrimaryAlignItems: ["primaryAxisAlignItems"],
   stackCounterAlignItems: ["counterAxisAlignItems"],
   stackHorizontalPadding: ["paddingLeft"],
+  stackPaddingLeft: ["paddingLeft"],
   stackPaddingRight: ["paddingRight"],
   stackVerticalPadding: ["paddingTop"],
+  stackPaddingTop: ["paddingTop"],
   stackPaddingBottom: ["paddingBottom"],
   stackPositioning: ["layoutPositioning"],
   stackChildAlignSelf: ["layoutAlign"],
@@ -431,9 +433,12 @@ function layoutContainer(n: any, out: any): void {
   if (justify && justify !== "MIN") out.primaryAxisAlignItems = justify === "SPACE_EVENLY" ? "SPACE_BETWEEN" : justify;
   const align = n.stackCounterAlignItems;
   if (align && align !== "MIN") out.counterAxisAlignItems = align;
-  if (n.stackHorizontalPadding) out.paddingLeft = n.stackHorizontalPadding;
+  // Older files name the left and top padding stackPaddingLeft and stackPaddingTop.
+  const left = n.stackHorizontalPadding ?? n.stackPaddingLeft;
+  const top = n.stackVerticalPadding ?? n.stackPaddingTop;
+  if (left) out.paddingLeft = left;
   if (n.stackPaddingRight) out.paddingRight = n.stackPaddingRight;
-  if (n.stackVerticalPadding) out.paddingTop = n.stackVerticalPadding;
+  if (top) out.paddingTop = top;
   if (n.stackPaddingBottom) out.paddingBottom = n.stackPaddingBottom;
   if (n.stackSpacing) out.itemSpacing = n.stackSpacing;
   if (n.stackReverseZIndex) out.itemReverseZIndex = true;

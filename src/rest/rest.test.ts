@@ -62,6 +62,16 @@ describe("toRestDocument", () => {
     expect(rest.get("1:3")).toMatchObject({ type: "GROUP", clipsContent: false });
   });
 
+  it("reads the left and top padding of older files", () => {
+    const doc = docOf([
+      { id: 1, parent: 100, type: "FRAME", stackMode: "HORIZONTAL", stackPaddingLeft: 16, stackPaddingTop: 8, stackPaddingRight: 4, stackPaddingBottom: 2 },
+      { id: 2, parent: 100, type: "FRAME", stackMode: "HORIZONTAL", stackHorizontalPadding: 6, stackPaddingLeft: 16 },
+    ]);
+    const rest = index(toRestDocument(doc).document);
+    expect(rest.get("1:1")).toMatchObject({ paddingLeft: 16, paddingTop: 8, paddingRight: 4, paddingBottom: 2 });
+    expect(rest.get("1:2")).toMatchObject({ paddingLeft: 6 });
+  });
+
   it("reads line heights in kiwi's three units", () => {
     const meta = { derivedTextData: { fontMetaData: [{ key: { family: "Inter", style: "Regular" }, fontLineHeight: 1.25, fontWeight: 400 }] } };
     const text = (id: number, lineHeight?: any) => ({
