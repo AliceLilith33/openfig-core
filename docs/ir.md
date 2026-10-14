@@ -253,7 +253,7 @@ covered above:
 | `mask` | `alpha`, `vector` (by outline) or `luminance`. |
 | `layout` (flex) | Also `wrap`, `lineGap` (between wrapped lines), `alignContent`, `strokesInLayout` (borders take up space). |
 | `layout` (grid) | `rows`, `columns` as CSS track lists, `rowGap`, `columnGap`, `padding`. |
-| `text.lines` | Per line: `list` (`ordered`, `unordered`) and `indent` level. |
+| `text.lines` | Per line (paragraph): `list` (`ordered`, `unordered`), `indent` level, and `start`, the number an ordered item shows where it restarts the count (from the `.fig` only; REST has no such field). |
 | `text.maxLines`, `autoResize: "truncate"` | The text is cut with an ellipsis. |
 | `text.link`, `runs[].link` | A URL, or `#<node id>`. |
 | `propRefs` | Which component property drives `characters`, `visible` or `mainComponent`. |

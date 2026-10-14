@@ -293,8 +293,12 @@ export interface IRText {
   style: IRTextStyle;
   /** Spans styled differently from `style`, in order, covering the whole content. Absent when uniform. */
   runs?: IRTextRun[];
-  /** List formatting per line, when any line is a list item. */
-  lines?: Array<{ list?: "ordered" | "unordered"; indent?: number }>;
+  /**
+   * List formatting per line (paragraph), when any line is a list item.
+   * `start`: the number an ordered item shows when it does not continue the
+   * count from the items before it at its level (absent: counting on, from 1).
+   */
+  lines?: Array<{ list?: "ordered" | "unordered"; indent?: number; start?: number }>;
   /** How the box follows the text: `width` grows both ways, `height` wraps at the width. */
   autoResize?: "width" | "height" | "truncate";
   maxLines?: number;

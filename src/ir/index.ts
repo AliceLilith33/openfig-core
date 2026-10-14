@@ -37,6 +37,8 @@ export interface ToDesignIROptions {
   iconMaxSize?: number;
   /** Figma's layout of each text, by node id, from `toRestDocument`'s `textLines`. */
   textLines?: Map<string, TextLine[]>;
+  /** Where numbered lists start, by node id, from `toRestDocument`'s `listStarts`. */
+  listStarts?: Map<string, number[]>;
 }
 
 const VECTOR_TYPES = new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "REGULAR_POLYGON"]);
@@ -306,9 +308,11 @@ function irText(ctx: Ctx, n: any): IRText {
   const types: string[] = n.lineTypes ?? [];
   if (types.some((t) => t !== "NONE")) {
     const indents: number[] = n.lineIndentations ?? [];
+    const starts = ctx.options.listStarts?.get(n.id) ?? [];
     out.lines = types.map((t, i) => {
       const line: NonNullable<IRText["lines"]>[number] = {};
       if (t === "ORDERED") line.list = "ordered";
+      if (t === "ORDERED" && starts[i]) line.start = starts[i] + 1;
       if (t === "UNORDERED") line.list = "unordered";
       if (indents[i]) line.indent = indents[i];
       return line;
@@ -863,11 +867,13 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
 }
 
 /** The design IR of a parsed .fig file: `toDesignIR` over its REST view, with geometry, variables and images. */
-export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines"> = {}): DesignIR {
+export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines" | "listStarts"> = {}): DesignIR {
   const textLines = new Map<string, TextLine[]>();
-  return toDesignIR(toRestDocument(doc, { geometry: true, textLines }), {
+  const listStarts = new Map<string, number[]>();
+  return toDesignIR(toRestDocument(doc, { geometry: true, textLines, listStarts }), {
     ...options,
     textLines,
+    listStarts,
     variables: toRestVariables(doc),
     images: doc.images,
   });

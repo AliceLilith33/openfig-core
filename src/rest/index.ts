@@ -28,6 +28,12 @@ export interface ToRestOptions {
    * id: what `derivedTextData` saved. REST has no field for them.
    */
   textLines?: Map<string, TextLine[]>;
+  /**
+   * Filled, when given, with each list text's `listStartOffset` per line, by
+   * node id: an ordered item that starts a list shows this number plus one.
+   * REST has no field for it.
+   */
+  listStarts?: Map<string, number[]>;
 }
 
 /**
@@ -57,6 +63,7 @@ interface Ctx {
   /** Each converted node's painted area, clipped, even where REST reports null (masks, operands). */
   painted: WeakMap<object, Rect | null>;
   textLines?: Map<string, TextLine[]>;
+  listStarts?: Map<string, number[]>;
   /** SVG path of each geometry blob already written: instances share their components' blobs. */
   paths: Map<Uint8Array, string>;
 }
@@ -890,6 +897,8 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     }
     const lines = ctx.textLines && textLines(n);
     if (lines) ctx.textLines!.set(id, lines);
+    const starts: number[] | undefined = n.textData?.lines?.map((l: any) => l?.listStartOffset ?? 0);
+    if (ctx.listStarts && starts?.some((s) => s)) ctx.listStarts.set(id, starts);
   }
   if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
   if (type === "ELLIPSE") {
@@ -994,7 +1003,7 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, paths: new Map() };
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, listStarts: options.listStarts, paths: new Map() };
   const document = convert(ctx, resolveTree(doc, root, { shareValues: true }), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,

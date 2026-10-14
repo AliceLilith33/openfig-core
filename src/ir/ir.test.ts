@@ -142,6 +142,14 @@ describe("toDesignIR", () => {
     expect(ir.assets.fonts.map((f) => `${f.family} ${f.style}`)).toEqual(["Inter Regular", "Inter Bold"]);
   });
 
+  it("numbers an ordered item that restarts the count from the file's list start", () => {
+    const style = { fontFamily: "Inter", fontStyle: "Regular", fontWeight: 400, fontSize: 16, lineHeightPx: 19.36, lineHeightUnit: "PIXELS" };
+    const ir = toDesignIR(file([
+      node("1:1", "TEXT", { characters: "four\nfive", lineTypes: ["ORDERED", "ORDERED"], lineIndentations: [1, 1], style }),
+    ]), { listStarts: new Map([["1:1", [3, 0]]]) });
+    expect(index(ir).get("1:1")!.text!.lines).toEqual([{ list: "ordered", indent: 1, start: 4 }, { list: "ordered", indent: 1 }]);
+  });
+
   it("counts an emoji outside the BMP as one character when splitting runs", () => {
     const ir = toDesignIR(file([
       node("1:1", "TEXT", {
