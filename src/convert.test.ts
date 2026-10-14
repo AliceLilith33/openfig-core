@@ -384,6 +384,49 @@ describe("convertDeckToFig regressions", () => {
     }
   });
 
+  it("carries the internal-only canvas so variables keep their parent", () => {
+    const nodes = [
+      ...scaffold(),
+      child(5, "CANVAS", 0, "~", { name: "Internal Only Canvas", internalOnly: true, visible: false }),
+      child(6, "VARIABLE_SET", 5, "!"),
+      child(7, "VARIABLE", 5, "\""),
+      child(10, "SLIDE", 3, "!"),
+    ];
+    const out = convertDeckToFig(mockDoc(nodes));
+
+    const internal = out.nodes.filter((n) => n.type === "CANVAS" && n.internalOnly);
+    expect(internal).toHaveLength(1);
+    expect(internal[0].guid).toEqual(gid(5));
+    expect(internal[0].parentIndex).toEqual({ guid: gid(0), position: "~" });
+    for (const id of [6, 7]) {
+      expect(out.nodeMap.get(key(gid(id)))!.parentIndex!.guid).toEqual(gid(5));
+    }
+    expect(out.childrenMap.get(key(gid(5)))!.map((n) => n.type)).toEqual(["VARIABLE_SET", "VARIABLE"]);
+  });
+
+  it("creates an internal-only canvas for variables whose parent is not carried over", () => {
+    const nodes = [
+      ...scaffold(),
+      child(6, "VARIABLE_SET", 1, "!"), // on the slides canvas, which is replaced
+      child(7, "VARIABLE", 6, "!"), // under the set, which is carried
+      child(10, "SLIDE", 3, "!"),
+    ];
+    const out = convertDeckToFig(mockDoc(nodes));
+
+    const internal = out.nodes.filter((n) => n.type === "CANVAS" && n.internalOnly);
+    expect(internal).toHaveLength(1);
+    expect(out.nodeMap.get(key(gid(6)))!.parentIndex!.guid).toEqual(internal[0].guid);
+    expect(out.nodeMap.get(key(gid(7)))!.parentIndex!.guid).toEqual(gid(6));
+    for (const node of out.nodes) {
+      if (node.parentIndex) expect(out.nodeMap.has(key(node.parentIndex.guid))).toBe(true);
+    }
+  });
+
+  it("adds no internal-only canvas when there are no variables", () => {
+    const out = convertDeckToFig(mockDoc([...scaffold(), child(10, "SLIDE", 3, "!")]));
+    expect(out.nodes.filter((n) => n.type === "CANVAS")).toHaveLength(1);
+  });
+
   it("stops expanding a symbol that contains an instance of itself", () => {
     const nodes = [
       ...scaffold(),

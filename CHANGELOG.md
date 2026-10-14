@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`convertDeckToFig` could put slides out of order.** It sorted slides by their own positions with `localeCompare`, but positions only order siblings: in a deck where each slide sits in its own `MODULE`, every slide is at `!`. Slides are now collected by walking `SLIDE_GRID` → `SLIDE_ROW` → `MODULE` → `SLIDE` in position order. Slides under a removed row or module are no longer included.
 - **`convertDeckToFig` matched symbol overrides by `guid`.** Override paths address nodes by `overrideKey`, which differs from the guid on every overrideable node in the reference decks, so overrides on real files were not applied. Multi-segment paths are now resolved through each nested instance instead of by their last segment alone.
 - **`convertDeckToFig` left nested instances pointing at symbols it does not carry over.** Every instance is now baked: detached into a `FRAME`, with its symbol's children expanded under it and its overrides applied (outer overrides win; `overriddenSymbolID` swaps are honoured; cyclic symbols stop expanding). Every slide-level instance is baked, not only the first, and children of a slide are re-positioned so flattened instance content keeps its place among the slide's other children.
+- **`convertDeckToFig` copied variables without their parent.** Figma keeps `VARIABLE` and `VARIABLE_SET` nodes on the document's internal-only canvas, which the conversion did not carry over, leaving every variable pointing at a missing node. The internal-only canvas is now kept with its GUID; one is created when the source has none, and a variable whose parent is not carried over is moved onto it.
 
 ### Added
 
@@ -23,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known limitations
 
 - `convertDeckToFig` applies only `textData.characters`, `fillPaints` and `strokePaints` from overrides; `componentPropAssignments` and `derivedSymbolData` are not resolved.
-- Variables copied by `convertDeckToFig` keep their parent, an internal canvas that is not carried over.
 
 ## [0.4.1] - 2026-08-01
 

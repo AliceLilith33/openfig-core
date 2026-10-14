@@ -406,8 +406,40 @@ export function convertDeckToFig(
   const supportNodes = deckDoc.nodes.filter((n) =>
     globalSupportTypes.has(n.type) && n.phase !== "REMOVED"
   );
-  for (const sNode of supportNodes) {
-    outputNodes.push(safeDeepClone(sNode));
+  // Figma keeps variables on the document's internal-only canvas. Carry it over
+  // with its GUID so their parent references hold; a variable whose parent is
+  // not carried over is moved onto it.
+  if (supportNodes.length > 0) {
+    const sourceInternal = deckDoc.nodes.find(
+      (n) => n.type === "CANVAS" && n.internalOnly && n.phase !== "REMOVED",
+    );
+    const internalCanvas: FigNode = sourceInternal
+      ? safeDeepClone(sourceInternal)
+      : {
+          guid: generateGuid(),
+          type: "CANVAS",
+          name: "Internal Only Canvas",
+          phase: "CREATED",
+          visible: false,
+          internalOnly: true,
+        };
+    internalCanvas.parentIndex = { guid: docGuid, position: "~" };
+    outputNodes.push(internalCanvas);
+
+    const carried = new Set(supportNodes.map((n) => guidToString(n.guid)));
+    carried.add(guidToString(internalCanvas.guid));
+    for (const sNode of supportNodes) {
+      const clone = safeDeepClone(sNode);
+      const parentGuid = clone.parentIndex?.guid;
+      if (!parentGuid || !carried.has(guidToString(parentGuid))) {
+        clone.parentIndex = {
+          ...(clone.parentIndex ?? {}),
+          guid: internalCanvas.guid,
+          position: clone.parentIndex?.position ?? "!",
+        };
+      }
+      outputNodes.push(clone);
+    }
   }
 
   // Build target childrenMap and nodeMap
