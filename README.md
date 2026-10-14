@@ -91,6 +91,25 @@ interface FigNode {
 }
 ```
 
+## Reading the tree
+
+```ts
+import { parseFig, walk, getAbsoluteTransform, getAbsoluteBoundingBox } from 'openfig-core';
+
+const doc = parseFig(data);
+const page = doc.nodes.find((n) => n.type === 'CANVAS' && !n.internalOnly)!;
+
+walk(doc, page, (node, depth) => {
+  console.log('  '.repeat(depth) + node.name, getAbsoluteBoundingBox(doc, node));
+  if (node.type === 'INSTANCE') return false; // don't descend
+});
+```
+
+- `walk(doc, root, visit, { includeRemoved })` — depth-first, parents before children, siblings back to front. Return `false` to skip a subtree. `REMOVED` nodes are skipped unless asked for.
+- `findAll(doc, root, predicate)`, `parentOf(doc, node)`, `ancestors(doc, node)` (nearest first), `pageOf(doc, node)`.
+- `getAbsoluteTransform(doc, node)` — the node's transform in page coordinates (Figma's `absoluteTransform`). `getAbsoluteBoundingBox(doc, node)` — the box around its transformed `size`, without strokes or effects.
+- `multiplyTransform(a, b)`, `applyTransform(t, x, y)`, `IDENTITY_TRANSFORM`.
+
 ## Encoding (write .fig files)
 
 ### Round-trip: open, edit, save

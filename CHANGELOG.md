@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
 - `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
 - `liveChildren(doc, id)` — a node's children in layer order, without `REMOVED` nodes.
+- Tree helpers: `walk`, `findAll`, `parentOf`, `ancestors`, `pageOf`. They tolerate dangling parents and parent cycles.
+- `getAbsoluteTransform` and `getAbsoluteBoundingBox` — page coordinates, composed up to the node's `CANVAS`; with `multiplyTransform`, `applyTransform` and `IDENTITY_TRANSFORM`.
 
 ### Changed
 
