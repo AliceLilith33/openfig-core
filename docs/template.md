@@ -8,7 +8,7 @@ hand-sourced binary.
 ## How it works
 
 ```
-src/utilities/figKiwiSchema.ts    ← our own 550-def TypeScript schema
+src/utilities/figKiwiSchema.ts    ← our own 631-def TypeScript schema
 src/utilities/generateTemplate.ts ← our own node definitions + encoder
         ↓
 src/schema.ts  (emptyFigTemplate base64 blob)
@@ -30,10 +30,14 @@ then rebuild.
 
 ## Schema definition
 
-`figKiwiSchema.ts` contains all 550 kiwi type definitions for the `.fig` wire
+`figKiwiSchema.ts` contains all 631 kiwi type definitions for the `.fig` wire
 format, expressed as our own TypeScript. It was produced by
 `src/utilities/readSchema.ts`, which reads the self-describing schema from any
-`.fig` file and outputs it as a typed constant.
+`.fig` file and outputs it as a typed constant. It was last regenerated from a
+version-106 file whose schema contains every field of every other schema seen in
+181 public files, apart from fields Figma has since removed (`htmlTag`,
+`SparseMessage`). The shipped `emptyFigTemplate` was generated from the earlier
+550-definition schema and has not been regenerated since.
 
 The kiwi schema is embedded by Figma's software in every `.fig` file they
 produce — that is by design, since kiwi is a self-describing format intended

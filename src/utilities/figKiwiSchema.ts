@@ -6,7 +6,7 @@
  * wire-protocol numbers analogous to protobuf field numbers, read from the
  * embedded kiwi schema for interoperability purposes.
  *
- * 550 definitions covering all node types, enums, and message structures.
+ * 631 definitions covering all node types, enums, and message structures.
  * Regenerate with: npx tsx src/utilities/readSchema.ts <seed.fig>
  */
 
@@ -135,6 +135,10 @@ export const figKiwiSchema = {
       { name: "ANIMATION_PRESET_INSTANCE", value: 58, type: null, isArray: false, isDeprecated: false },
       { name: "CODE_EMBED", value: 59, type: null, isArray: false, isDeprecated: false },
       { name: "BINARY_FILE", value: 60, type: null, isArray: false, isDeprecated: false },
+      { name: "SPEC_BLOCK", value: 61, type: null, isArray: false, isDeprecated: false },
+      { name: "TOOL_INSTANCE", value: 62, type: null, isArray: false, isDeprecated: false },
+      { name: "CUSTOM_EFFECT_INSTANCE", value: 63, type: null, isArray: false, isDeprecated: false },
+      { name: "NATIVE_CODE_LAYER_INSTANCE", value: 64, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -209,6 +213,7 @@ export const figKiwiSchema = {
       { name: "VIDEO", value: 7, type: null, isArray: false, isDeprecated: false },
       { name: "PATTERN", value: 8, type: null, isArray: false, isDeprecated: false },
       { name: "NOISE", value: 9, type: null, isArray: false, isDeprecated: false },
+      { name: "CUSTOM", value: 10, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -232,6 +237,7 @@ export const figKiwiSchema = {
       { name: "GRAIN", value: 6, type: null, isArray: false, isDeprecated: false },
       { name: "NOISE", value: 7, type: null, isArray: false, isDeprecated: false },
       { name: "GLASS", value: 8, type: null, isArray: false, isDeprecated: false },
+      { name: "CUSTOM", value: 9, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -294,6 +300,7 @@ export const figKiwiSchema = {
       { name: "CENTER", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "INSIDE", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "OUTSIDE", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "OFFSET", value: 3, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -318,6 +325,8 @@ export const figKiwiSchema = {
       { name: "ERD_EXACTLY_ONE", value: 16, type: null, isArray: false, isDeprecated: false },
       { name: "ERD_ZERO_OR_MORE", value: 17, type: null, isArray: false, isDeprecated: false },
       { name: "ERD_ONE_OR_MORE", value: 18, type: null, isArray: false, isDeprecated: false },
+      { name: "ERD_ONE", value: 19, type: null, isArray: false, isDeprecated: false },
+      { name: "ERD_MANY", value: 20, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -393,6 +402,10 @@ export const figKiwiSchema = {
       { name: "SVG", value: 2, type: null, isArray: false, isDeprecated: false },
       { name: "PDF", value: 3, type: null, isArray: false, isDeprecated: false },
       { name: "MP4", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "GIF", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "WEBM", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "LOTTIE", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "DOTLOTTIE", value: 8, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -432,6 +445,14 @@ export const figKiwiSchema = {
     fields: [
       { name: "DISABLED", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "ENDING", value: 1, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "TextWrapStyle",
+    fields: [
+      { name: "AUTO", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "BALANCE", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "PRETTY", value: 2, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -489,6 +510,8 @@ export const figKiwiSchema = {
       { name: "MAX", value: 2, type: null, isArray: false, isDeprecated: false },
       { name: "SPACE_EVENLY", value: 3, type: null, isArray: false, isDeprecated: false },
       { name: "SPACE_BETWEEN", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "SPACE_AROUND", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "SPACE_EVENLY_CSS", value: 6, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -621,6 +644,8 @@ export const figKiwiSchema = {
       { name: "SPRING_PRESET_ONE", value: 11, type: null, isArray: false, isDeprecated: false },
       { name: "SPRING_PRESET_TWO", value: 12, type: null, isArray: false, isDeprecated: false },
       { name: "SPRING_PRESET_THREE", value: 13, type: null, isArray: false, isDeprecated: false },
+      { name: "HOLD", value: 14, type: null, isArray: false, isDeprecated: false },
+      { name: "EASE_IN", value: 15, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -684,6 +709,35 @@ export const figKiwiSchema = {
       { name: "color", value: 1, type: "Color", isArray: false, isDeprecated: false },
       { name: "colorVar", value: 2, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "position", value: 3, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "ColorSpace",
+    fields: [
+      { name: "DEFAULT", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "SRGB", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "DISPLAY_P3", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "HSL", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "HSB", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "OKLAB", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "OKLCH", value: 6, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AuthoredColor",
+    fields: [
+      { name: "space", value: 1, type: "ColorSpace", isArray: false, isDeprecated: false },
+      { name: "c0", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "c1", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "c2", value: 4, type: "float", isArray: false, isDeprecated: false },
+      { name: "c3", value: 5, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AuthoredColorStop",
+    fields: [
+      { name: "authoredColor", value: 1, type: "AuthoredColor", isArray: false, isDeprecated: false },
+      { name: "position", value: 2, type: "float", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -795,12 +849,54 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "ENUM", name: "CachedPreviewStatus",
+    fields: [
+      { name: "UNKNOWN", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "PENDING", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "COMPLETE", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "FAILED", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "ERROR", value: 4, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "SnapshotCaptureMode",
+    fields: [
+      { name: "FULL", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "PARTIAL", value: 1, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CodeSourceInfo",
+    fields: [
+      { name: "originReferenceId", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "originNodeId", value: 2, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "linkedSnapshotId", value: 3, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "captureMode", value: 4, type: "SnapshotCaptureMode", isArray: false, isDeprecated: false },
+      { name: "sourceBlobRef", value: 5, type: "string", isArray: false, isDeprecated: false },
+      { name: "sourceElementId", value: 6, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "ENUM", name: "CodeObjectType",
     fields: [
       { name: "WEB_LAYER", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "WEB_INTERACTION", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "NATIVE_LAYER", value: 2, type: null, isArray: false, isDeprecated: false },
       { name: "ANIMATION_PRESET", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "TOOL", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "CUSTOM_EFFECT", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "PLUGIN", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "WEB_LAYER_GENERIC", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "CUSTOM_FILL", value: 8, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CustomToolArtifactRef",
+    fields: [
+      { name: "customToolId", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "customToolVersion", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "publishedCustomToolId", value: 3, type: "string", isArray: false, isDeprecated: false },
+      { name: "publishedCustomToolVersionId", value: 4, type: "string", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1088,6 +1184,20 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "MESSAGE", name: "WeaveConnection",
+    fields: [
+      { name: "workflowId", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "nodeId", value: 2, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "WeaveLayerConnection",
+    fields: [
+      { name: "weaveVariableId", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "paintId", value: 2, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "STRUCT", name: "FilterColorAdjust",
     fields: [
       { name: "tint", value: 1, type: "float", isArray: false, isDeprecated: false },
@@ -1143,6 +1253,8 @@ export const figKiwiSchema = {
       { name: "colorVar", value: 21, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "imageVar", value: 31, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "stopsVar", value: 23, type: "ColorStopVar", isArray: true, isDeprecated: false },
+      { name: "gradientVar", value: 43, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "paintVar", value: 46, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "thumbHashBase64", value: 24, type: "string", isArray: false, isDeprecated: false },
       { name: "thumbHash", value: 25, type: "byte", isArray: true, isDeprecated: false },
       { name: "sourceNodeId", value: 26, type: "GUID", isArray: false, isDeprecated: false },
@@ -1156,6 +1268,31 @@ export const figKiwiSchema = {
       { name: "noiseType", value: 34, type: "NoiseType", isArray: false, isDeprecated: false },
       { name: "density", value: 35, type: "float", isArray: false, isDeprecated: false },
       { name: "noiseSize", value: 36, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "customEffectId", value: 39, type: "CodeComponentId", isArray: false, isDeprecated: false },
+      { name: "componentPropAssignments", value: 40, type: "ComponentPropAssignment", isArray: true, isDeprecated: false },
+      { name: "interpolationColorSpace", value: 41, type: "InterpolationColorSpace", isArray: false, isDeprecated: false },
+      { name: "interpolationHueMethod", value: 42, type: "InterpolationHueMethod", isArray: false, isDeprecated: false },
+      { name: "authoredColor", value: 44, type: "AuthoredColor", isArray: false, isDeprecated: false },
+      { name: "authoredStops", value: 45, type: "AuthoredColorStop", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "InterpolationColorSpace",
+    fields: [
+      { name: "DEFAULT", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "OKLAB", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "OKLCH", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "HSL", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "SRGB_LINEAR", value: 4, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "InterpolationHueMethod",
+    fields: [
+      { name: "SHORTER", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "LONGER", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "INCREASING", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "DECREASING", value: 3, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1564,6 +1701,8 @@ export const figKiwiSchema = {
       { name: "historyOpsWithLoc", value: 2, type: "CollaborativeTextStrippedOpRunWithLoc", isArray: true, isDeprecated: false },
       { name: "historyStringContentBuffer", value: 3, type: "byte", isArray: true, isDeprecated: false },
       { name: "changesToAppend", value: 4, type: "CollaborativeTextOpRun", isArray: true, isDeprecated: false },
+      { name: "snapshotText", value: 5, type: "string", isArray: false, isDeprecated: false },
+      { name: "snapshotVersion", value: 6, type: "CollaborativeTextOpID", isArray: true, isDeprecated: false },
     ],
   },
   {
@@ -1736,6 +1875,8 @@ export const figKiwiSchema = {
       { name: "startRadius", value: 21, type: "float", isArray: false, isDeprecated: false },
       { name: "color", value: 2, type: "Color", isArray: false, isDeprecated: false },
       { name: "secondaryColor", value: 24, type: "Color", isArray: false, isDeprecated: false },
+      { name: "authoredColor", value: 56, type: "AuthoredColor", isArray: false, isDeprecated: false },
+      { name: "secondaryAuthoredColor", value: 57, type: "AuthoredColor", isArray: false, isDeprecated: false },
       { name: "noiseSize", value: 22, type: "Vector", isArray: false, isDeprecated: false },
       { name: "seed", value: 29, type: "uint", isArray: false, isDeprecated: false },
       { name: "clipToShape", value: 23, type: "bool", isArray: false, isDeprecated: false },
@@ -1755,6 +1896,19 @@ export const figKiwiSchema = {
       { name: "chromaticAberrationVar", value: 40, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "splayVar", value: 41, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "refractionIntensityVar", value: 42, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "customEffectId", value: 43, type: "CodeComponentId", isArray: false, isDeprecated: false },
+      { name: "componentPropAssignments", value: 44, type: "ComponentPropAssignment", isArray: true, isDeprecated: false },
+      { name: "startRadiusVar", value: 45, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "startOffsetXVar", value: 46, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "startOffsetYVar", value: 47, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "endOffsetXVar", value: 48, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "endOffsetYVar", value: 49, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "noiseSizeXVar", value: 50, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "noiseSizeYVar", value: 51, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "densityVar", value: 52, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "effectOpacityVar", value: 53, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "secondaryColorVar", value: 54, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "id", value: 55, type: "GUID", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1778,6 +1932,112 @@ export const figKiwiSchema = {
       { name: "order", value: 8, type: "RepeatOrder", isArray: false, isDeprecated: false },
       { name: "skewX", value: 9, type: "float", isArray: false, isDeprecated: false },
       { name: "skewY", value: 10, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "TransformSchemaType",
+    fields: [
+      { name: "NONE", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "FIXED_ORDER", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "FREEFORM", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "STRUCT", name: "Matrix4f",
+    fields: [
+      { name: "m00", value: 1, type: "float", isArray: false, isDeprecated: false },
+      { name: "m01", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "m02", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "m03", value: 4, type: "float", isArray: false, isDeprecated: false },
+      { name: "m10", value: 5, type: "float", isArray: false, isDeprecated: false },
+      { name: "m11", value: 6, type: "float", isArray: false, isDeprecated: false },
+      { name: "m12", value: 7, type: "float", isArray: false, isDeprecated: false },
+      { name: "m13", value: 8, type: "float", isArray: false, isDeprecated: false },
+      { name: "m20", value: 9, type: "float", isArray: false, isDeprecated: false },
+      { name: "m21", value: 10, type: "float", isArray: false, isDeprecated: false },
+      { name: "m22", value: 11, type: "float", isArray: false, isDeprecated: false },
+      { name: "m23", value: 12, type: "float", isArray: false, isDeprecated: false },
+      { name: "m30", value: 13, type: "float", isArray: false, isDeprecated: false },
+      { name: "m31", value: 14, type: "float", isArray: false, isDeprecated: false },
+      { name: "m32", value: 15, type: "float", isArray: false, isDeprecated: false },
+      { name: "m33", value: 16, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "FixedOrderTransform3d",
+    fields: [
+      { name: "perspective", value: 1, type: "float", isArray: false, isDeprecated: false },
+      { name: "translateZ", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "rotateX", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "rotateY", value: 4, type: "float", isArray: false, isDeprecated: false },
+      { name: "rotateZ", value: 5, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "TransformFnType",
+    fields: [
+      { name: "NONE", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "MATRIX_3D", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "PERSPECTIVE", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSLATE_Z", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATE_X", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATE_Y", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATE_Z", value: 6, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "TransformFnValue",
+    fields: [
+      { name: "matrix3d", value: 1, type: "Matrix4f", isArray: false, isDeprecated: false },
+      { name: "perspective", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "rotateAngle", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "translateValue", value: 4, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "TransformFn",
+    fields: [
+      { name: "type", value: 1, type: "TransformFnType", isArray: false, isDeprecated: false },
+      { name: "value", value: 2, type: "TransformFnValue", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "TransformSchemaValue",
+    fields: [
+      { name: "fixedOrderTransform3d", value: 1, type: "FixedOrderTransform3d", isArray: false, isDeprecated: false },
+      { name: "transformFunctions", value: 2, type: "TransformFn", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Transform3d",
+    fields: [
+      { name: "type", value: 1, type: "TransformSchemaType", isArray: false, isDeprecated: false },
+      { name: "value", value: 2, type: "TransformSchemaValue", isArray: false, isDeprecated: false },
+      { name: "backfaceHidden", value: 3, type: "bool", isArray: false, isDeprecated: false },
+      { name: "visible", value: 4, type: "bool", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "STRUCT", name: "NumberVector2D",
+    fields: [
+      { name: "x", value: 1, type: "Number", isArray: false, isDeprecated: false },
+      { name: "y", value: 2, type: "Number", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Scene3d",
+    fields: [
+      { name: "perspective", value: 1, type: "float", isArray: false, isDeprecated: false },
+      { name: "perspectiveOrigin", value: 2, type: "NumberVector2D", isArray: false, isDeprecated: false },
+      { name: "preserve3d", value: 3, type: "bool", isArray: false, isDeprecated: false },
+      { name: "visible", value: 4, type: "bool", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "TransformOrigin",
+    fields: [
+      { name: "x", value: 1, type: "Number", isArray: false, isDeprecated: false },
+      { name: "y", value: 2, type: "Number", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1866,6 +2126,14 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "ENUM", name: "ExportBackgroundType",
+    fields: [
+      { name: "SOLID", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSPARENT", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "GRID", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "MESSAGE", name: "ExportSettings",
     fields: [
       { name: "suffix", value: 1, type: "string", isArray: false, isDeprecated: false },
@@ -1880,6 +2148,11 @@ export const figKiwiSchema = {
       { name: "colorProfile", value: 10, type: "ExportColorProfile", isArray: false, isDeprecated: false },
       { name: "quality", value: 11, type: "float", isArray: false, isDeprecated: false },
       { name: "useBicubicSampler", value: 12, type: "bool", isArray: false, isDeprecated: false },
+      { name: "frameRate", value: 13, type: "int", isArray: false, isDeprecated: false },
+      { name: "loopCount", value: 14, type: "int", isArray: false, isDeprecated: false },
+      { name: "backgroundType", value: 15, type: "ExportBackgroundType", isArray: false, isDeprecated: false },
+      { name: "duration", value: 16, type: "float", isArray: false, isDeprecated: false },
+      { name: "svgAnimated", value: 17, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1933,6 +2206,7 @@ export const figKiwiSchema = {
       { name: "EFFECT", value: 4, type: null, isArray: false, isDeprecated: false },
       { name: "EXPORT", value: 5, type: null, isArray: false, isDeprecated: false },
       { name: "GRID", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "ANIMATION", value: 7, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -1971,6 +2245,32 @@ export const figKiwiSchema = {
     kind: "MESSAGE", name: "StretchStrokeSettings",
     fields: [
       { name: "orientation", value: 1, type: "BrushOrientation", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "StrokeData",
+    fields: [
+      { name: "strokes", value: 1, type: "Stroke", isArray: true, isDeprecated: false },
+      { name: "version", value: 2, type: "uint", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Stroke",
+    fields: [
+      { name: "strokeId", value: 1, type: "int", isArray: false, isDeprecated: false },
+      { name: "strokeWeight", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "strokeWeightVar", value: 3, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "strokePaint", value: 4, type: "Paint", isArray: true, isDeprecated: false },
+      { name: "styleIdForStrokeFill", value: 5, type: "StyleId", isArray: false, isDeprecated: false },
+      { name: "strokeAlign", value: 6, type: "StrokeAlign", isArray: false, isDeprecated: false },
+      { name: "strokeCap", value: 7, type: "StrokeCap", isArray: false, isDeprecated: false },
+      { name: "strokeCapSize", value: 8, type: "Number", isArray: false, isDeprecated: false },
+      { name: "strokeJoin", value: 9, type: "StrokeJoin", isArray: false, isDeprecated: false },
+      { name: "miterLimit", value: 10, type: "float", isArray: false, isDeprecated: false },
+      { name: "dashPattern", value: 11, type: "float", isArray: true, isDeprecated: false },
+      { name: "pathTrim", value: 12, type: "OptionalVector", isArray: false, isDeprecated: false },
+      { name: "strokeOffset", value: 13, type: "float", isArray: false, isDeprecated: false },
+      { name: "isDeleted", value: 14, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -2036,6 +2336,7 @@ export const figKiwiSchema = {
       { name: "message", value: 2, type: "string", isArray: false, isDeprecated: false },
       { name: "command", value: 3, type: "string", isArray: false, isDeprecated: false },
       { name: "isDeleted", value: 4, type: "bool", isArray: false, isDeprecated: false },
+      { name: "customToolId", value: 5, type: "CodeComponentId", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -2286,6 +2587,7 @@ export const figKiwiSchema = {
       { name: "COOPER", value: 5, type: null, isArray: false, isDeprecated: false },
       { name: "ILLUSTRATION", value: 6, type: null, isArray: false, isDeprecated: false },
       { name: "FIGMAKE", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "FIGSPEC", value: 8, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -2368,6 +2670,13 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "ENUM", name: "VariableTimingDisplayUnit",
+    fields: [
+      { name: "MILLISECONDS", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "SECONDS", value: 1, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "MESSAGE", name: "NodeChange",
     fields: [
       { name: "guid", value: 1, type: "GUID", isArray: false, isDeprecated: false },
@@ -2414,10 +2723,12 @@ export const figKiwiSchema = {
       { name: "styleIdForText", value: 334, type: "StyleId", isArray: false, isDeprecated: false },
       { name: "styleIdForEffect", value: 335, type: "StyleId", isArray: false, isDeprecated: false },
       { name: "styleIdForGrid", value: 336, type: "StyleId", isArray: false, isDeprecated: false },
+      { name: "styleAnimations", value: 580, type: "StyleAnimation", isArray: true, isDeprecated: false },
       { name: "backgroundPaints", value: 193, type: "Paint", isArray: true, isDeprecated: false },
       { name: "inheritFillStyleIDForBackground", value: 194, type: "GUID", isArray: false, isDeprecated: false },
       { name: "isStateGroup", value: 225, type: "bool", isArray: false, isDeprecated: false },
       { name: "stateGroupPropertyValueOrders", value: 238, type: "StateGroupPropertyValueOrder", isArray: true, isDeprecated: false },
+      { name: "partialPasteAnnotation", value: 581, type: "PartialPasteAnnotation", isArray: false, isDeprecated: false },
       { name: "sharedSymbolReference", value: 122, type: "SharedSymbolReference", isArray: false, isDeprecated: false },
       { name: "isSymbolPublishable", value: 123, type: "bool", isArray: false, isDeprecated: false },
       { name: "sharedSymbolMappings", value: 124, type: "GUIDPathMapping", isArray: true, isDeprecated: false },
@@ -2502,6 +2813,7 @@ export const figKiwiSchema = {
       { name: "fontVariations", value: 260, type: "FontVariation", isArray: true, isDeprecated: false },
       { name: "textBidiVersion", value: 279, type: "uint", isArray: false, isDeprecated: false },
       { name: "textTruncation", value: 280, type: "TextTruncation", isArray: false, isDeprecated: false },
+      { name: "textWrapStyle", value: 594, type: "TextWrapStyle", isArray: false, isDeprecated: false },
       { name: "hasHadRTLText", value: 292, type: "bool", isArray: false, isDeprecated: false },
       { name: "emojiImageSet", value: 391, type: "EmojiImageSet", isArray: false, isDeprecated: false },
       { name: "slideThumbnailHash", value: 392, type: "string", isArray: false, isDeprecated: false },
@@ -2545,18 +2857,25 @@ export const figKiwiSchema = {
       { name: "strokePaintsTag", value: 91, type: "uint", isArray: false, isDeprecated: false },
       { name: "effects", value: 43, type: "Effect", isArray: true, isDeprecated: false },
       { name: "effectsTag", value: 95, type: "uint", isArray: false, isDeprecated: false },
+      { name: "audioFills", value: 603, type: "AudioFill", isArray: true, isDeprecated: false },
+      { name: "audioTracks", value: 605, type: "AudioTrack", isArray: true, isDeprecated: false },
       { name: "backgroundColor", value: 50, type: "Color", isArray: false, isDeprecated: false },
       { name: "backgroundColorTag", value: 102, type: "uint", isArray: false, isDeprecated: false },
       { name: "fillGeometry", value: 51, type: "Path", isArray: true, isDeprecated: false },
       { name: "fillGeometryTag", value: 103, type: "uint", isArray: false, isDeprecated: false },
       { name: "strokeGeometry", value: 52, type: "Path", isArray: true, isDeprecated: false },
       { name: "strokeGeometryTag", value: 104, type: "uint", isArray: false, isDeprecated: false },
+      { name: "offsetFillMaskGeometry", value: 564, type: "Path", isArray: true, isDeprecated: false },
       { name: "textDecorationFillPaints", value: 411, type: "Paint", isArray: true, isDeprecated: false },
       { name: "textDecorationSkipInk", value: 412, type: "bool", isArray: false, isDeprecated: false },
       { name: "textUnderlineOffset", value: 413, type: "Number", isArray: false, isDeprecated: false },
       { name: "textDecorationThickness", value: 415, type: "Number", isArray: false, isDeprecated: false },
       { name: "textDecorationStyle", value: 416, type: "TextDecorationStyle", isArray: false, isDeprecated: false },
       { name: "transformModifiers", value: 455, type: "TransformModifier", isArray: true, isDeprecated: false },
+      { name: "transform3d", value: 570, type: "Transform3d", isArray: false, isDeprecated: false },
+      { name: "strokeData", value: 571, type: "StrokeData", isArray: false, isDeprecated: false },
+      { name: "scene3d", value: 572, type: "Scene3d", isArray: false, isDeprecated: false },
+      { name: "transformOrigin", value: 587, type: "TransformOrigin", isArray: false, isDeprecated: false },
       { name: "rectangleTopLeftCornerRadius", value: 145, type: "float", isArray: false, isDeprecated: false },
       { name: "rectangleTopRightCornerRadius", value: 146, type: "float", isArray: false, isDeprecated: false },
       { name: "rectangleBottomLeftCornerRadius", value: 147, type: "float", isArray: false, isDeprecated: false },
@@ -2606,6 +2925,7 @@ export const figKiwiSchema = {
       { name: "maxSize", value: 326, type: "OptionalVector", isArray: false, isDeprecated: false },
       { name: "stackCounterAlignContent", value: 343, type: "StackCounterAlignContent", isArray: false, isDeprecated: false },
       { name: "sortedMovingChildIndices", value: 406, type: "int", isArray: true, isDeprecated: false },
+      { name: "stackLayoutVersion", value: 574, type: "uint", isArray: false, isDeprecated: false },
       { name: "gridRows", value: 435, type: "GUIDPositionMap", isArray: false, isDeprecated: false },
       { name: "gridColumns", value: 436, type: "GUIDPositionMap", isArray: false, isDeprecated: false },
       { name: "gridRowGap", value: 437, type: "float", isArray: false, isDeprecated: false },
@@ -2699,6 +3019,7 @@ export const figKiwiSchema = {
       { name: "isEmbeddedPrototype", value: 486, type: "bool", isArray: false, isDeprecated: false },
       { name: "slideSpeakerNotes", value: 389, type: "string", isArray: false, isDeprecated: false },
       { name: "isSkippedSlide", value: 410, type: "bool", isArray: false, isDeprecated: false },
+      { name: "presentationOutlines", value: 573, type: "MultiplayerMap", isArray: false, isDeprecated: false },
       { name: "themeID", value: 379, type: "ThemeID", isArray: false, isDeprecated: false },
       { name: "slideThemeData", value: 381, type: "SlideThemeData", isArray: false, isDeprecated: false },
       { name: "slideThemeMap", value: 390, type: "SlideThemeMap", isArray: false, isDeprecated: false },
@@ -2794,6 +3115,7 @@ export const figKiwiSchema = {
       { name: "variableResolvedType", value: 314, type: "VariableResolvedDataType", isArray: false, isDeprecated: false },
       { name: "variableDataValues", value: 315, type: "VariableDataValues", isArray: false, isDeprecated: false },
       { name: "variableTokenName", value: 350, type: "string", isArray: false, isDeprecated: false },
+      { name: "timingDisplayUnit", value: 566, type: "VariableTimingDisplayUnit", isArray: false, isDeprecated: false },
       { name: "variableScopes", value: 353, type: "VariableScope", isArray: true, isDeprecated: false },
       { name: "parameterConsumptionMap", value: 445, type: "VariableDataMap", isArray: false, isDeprecated: false },
       { name: "codeSyntax", value: 358, type: "CodeSyntaxMap", isArray: false, isDeprecated: false },
@@ -2870,6 +3192,7 @@ export const figKiwiSchema = {
       { name: "aiChatThread", value: 496, type: "AIChatThread", isArray: false, isDeprecated: false },
       { name: "codeChatMessagesKey", value: 484, type: "string", isArray: false, isDeprecated: false },
       { name: "codeSnapshot", value: 459, type: "CodeSnapshot", isArray: false, isDeprecated: false },
+      { name: "codeSnapshotLayers", value: 589, type: "CodeSnapshotLayers", isArray: false, isDeprecated: false },
       { name: "codeSnapshotInvalidatedAt", value: 480, type: "uint", isArray: false, isDeprecated: false },
       { name: "isCodeBehavior", value: 465, type: "bool", isArray: false, isDeprecated: false },
       { name: "autoForkCode", value: 469, type: "bool", isArray: false, isDeprecated: false },
@@ -2884,6 +3207,7 @@ export const figKiwiSchema = {
       { name: "isCodePreviewPlayingOnCanvas", value: 527, type: "bool", isArray: false, isDeprecated: false },
       { name: "codeEmbedInfo", value: 532, type: "CodeEmbedInfo", isArray: false, isDeprecated: false },
       { name: "isEmbedCodeLayer", value: 546, type: "bool", isArray: false, isDeprecated: false },
+      { name: "codeSourceInfo", value: 558, type: "CodeSourceInfo", isArray: false, isDeprecated: false },
       { name: "mimeType", value: 536, type: "string", isArray: false, isDeprecated: false },
       { name: "blobRef", value: 537, type: "byte", isArray: true, isDeprecated: false },
       { name: "cmsSelector", value: 419, type: "CMSSelector", isArray: false, isDeprecated: false },
@@ -2908,24 +3232,91 @@ export const figKiwiSchema = {
       { name: "backingNodeId", value: 499, type: "CanvasNodeId", isArray: false, isDeprecated: false },
       { name: "pageStatus", value: 548, type: "string", isArray: false, isDeprecated: false },
       { name: "motionTransform", value: 523, type: "TRSSTransform2D", isArray: false, isDeprecated: false },
+      { name: "linkMotionScaleAspectRatio", value: 597, type: "bool", isArray: false, isDeprecated: false },
       { name: "timelinePosition", value: 506, type: "int64", isArray: false, isDeprecated: false },
       { name: "keyframeValue", value: 507, type: "KeyframeValueData", isArray: false, isDeprecated: false },
+      { name: "keyframeValueRef", value: 586, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "interpolationType", value: 505, type: "InterpolationType", isArray: false, isDeprecated: false },
       { name: "bezierHandles", value: 508, type: "BezierHandles", isArray: false, isDeprecated: false },
       { name: "easingData", value: 535, type: "EasingData", isArray: false, isDeprecated: false },
+      { name: "motionPathBezierHandles", value: 598, type: "BezierHandles", isArray: false, isDeprecated: false },
+      { name: "interpolationColorSpace", value: 599, type: "InterpolationColorSpace", isArray: false, isDeprecated: false },
+      { name: "interpolationHueMethod", value: 600, type: "InterpolationHueMethod", isArray: false, isDeprecated: false },
       { name: "keyframeOperation", value: 509, type: "KeyframeOperation", isArray: false, isDeprecated: false },
       { name: "timelinePositionType", value: 510, type: "TimelinePositionType", isArray: false, isDeprecated: false },
+      { name: "trackLoopMode", value: 591, type: "TrackLoopMode", isArray: false, isDeprecated: false },
       { name: "isClip", value: 545, type: "bool", isArray: false, isDeprecated: false },
       { name: "clipId", value: 511, type: "GUID", isArray: false, isDeprecated: false },
       { name: "timelineDuration", value: 512, type: "uint64", isArray: false, isDeprecated: false },
+      { name: "timelineKeyframeSnappingFps", value: 601, type: "FrameRate", isArray: false, isDeprecated: false },
+      { name: "quantizeTimelinePlayback", value: 602, type: "bool", isArray: false, isDeprecated: false },
       { name: "timelineOffset", value: 513, type: "int64", isArray: false, isDeprecated: false },
       { name: "timelineDisabled", value: 543, type: "bool", isArray: false, isDeprecated: false },
       { name: "playbackStyle", value: 514, type: "PlaybackStyle", isArray: false, isDeprecated: false },
       { name: "timelineDefinitions", value: 552, type: "TimelineDefinitionsMap", isArray: false, isDeprecated: false },
       { name: "timelineAssignments", value: 553, type: "TimelineAssignmentsMap", isArray: false, isDeprecated: false },
       { name: "animationPresets", value: 521, type: "AnimationPresets", isArray: false, isDeprecated: false },
+      { name: "styleIdsForAnimation", value: 582, type: "StyleIdForAnimation", isArray: true, isDeprecated: false },
+      { name: "backingAnimationPresetId", value: 583, type: "AnimationPresetId", isArray: false, isDeprecated: false },
+      { name: "tools", value: 568, type: "Tools", isArray: false, isDeprecated: false },
+      { name: "customEffects", value: 569, type: "CustomEffects", isArray: false, isDeprecated: false },
       { name: "transitionOverrides", value: 526, type: "TransitionOverrideData", isArray: false, isDeprecated: false },
       { name: "useLegacySmartAnimate", value: 544, type: "bool", isArray: false, isDeprecated: false },
+      { name: "sourceControlConfig", value: 557, type: "SourceControlConfig", isArray: false, isDeprecated: false },
+      { name: "makeContentState", value: 595, type: "MakeContentState", isArray: false, isDeprecated: false },
+      { name: "specBlockType", value: 559, type: "SpecBlockType", isArray: false, isDeprecated: false },
+      { name: "specBlockContent", value: 560, type: "CollaborativePlainText", isArray: false, isDeprecated: false },
+      { name: "specCodeBlockLanguage", value: 561, type: "string", isArray: false, isDeprecated: false },
+      { name: "specBlockTableAlignment", value: 562, type: "string", isArray: false, isDeprecated: false },
+      { name: "specBlockIndentLevel", value: 563, type: "int", isArray: false, isDeprecated: false },
+      { name: "specImageHash", value: 575, type: "string", isArray: false, isDeprecated: false },
+      { name: "specWidth", value: 576, type: "int", isArray: false, isDeprecated: false },
+      { name: "specHeight", value: 577, type: "int", isArray: false, isDeprecated: false },
+      { name: "specBlockTableRowHeights", value: 578, type: "TableRowColumnSizeMap", isArray: false, isDeprecated: false },
+      { name: "specBlockTableColumnWidths", value: 579, type: "TableRowColumnSizeMap", isArray: false, isDeprecated: false },
+      { name: "specEmbedUrl", value: 590, type: "string", isArray: false, isDeprecated: false },
+      { name: "specCanvasScrollEnabled", value: 604, type: "bool", isArray: false, isDeprecated: false },
+      { name: "placeholder", value: 565, type: "bool", isArray: false, isDeprecated: false },
+      { name: "placeholderClientLifecycleId", value: 584, type: "string", isArray: false, isDeprecated: false },
+      { name: "placeholderInvalidateAt", value: 585, type: "int", isArray: false, isDeprecated: false },
+      { name: "disableJitDst", value: 567, type: "bool", isArray: false, isDeprecated: false },
+      { name: "customToolArtifactRef", value: 588, type: "CustomToolArtifactRef", isArray: false, isDeprecated: false },
+      { name: "weaveConnection", value: 592, type: "WeaveConnection", isArray: false, isDeprecated: false },
+      { name: "weaveLayerConnections", value: 593, type: "WeaveLayerConnection", isArray: true, isDeprecated: false },
+      { name: "weaveLayerId", value: 596, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "GitRepoRefProvider",
+    fields: [
+      { name: "UGIT", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "GITHUB", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "OTHER", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "GitRepoRef",
+    fields: [
+      { name: "provider", value: 1, type: "GitRepoRefProvider", isArray: false, isDeprecated: false },
+      { name: "gitRepo", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "gitRef", value: 3, type: "string", isArray: false, isDeprecated: false },
+      { name: "gitBaseRef", value: 4, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "SourceControlConfig",
+    fields: [
+      { name: "origin", value: 1, type: "GitRepoRef", isArray: false, isDeprecated: false },
+      { name: "upstream", value: 2, type: "GitRepoRef", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "MakeContentState",
+    fields: [
+      { name: "UNKNOWN", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "EMPTY", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "POPULATED", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "SEEDED", value: 3, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -2933,11 +3324,29 @@ export const figKiwiSchema = {
     fields: [
       { name: "state", value: 6, type: "CodeSnapshotState", isArray: false, isDeprecated: false },
       { name: "invalidatedAt", value: 7, type: "uint", isArray: false, isDeprecated: false },
+      { name: "cachedPreviewStatus", value: 8, type: "CachedPreviewStatus", isArray: false, isDeprecated: false },
+      { name: "commitSha", value: 9, type: "string", isArray: false, isDeprecated: false },
       { name: "paints", value: 1, type: "Paint", isArray: true, isDeprecated: false },
       { name: "offset", value: 2, type: "Vector", isArray: false, isDeprecated: false },
       { name: "layoutSize", value: 3, type: "Vector", isArray: false, isDeprecated: false },
       { name: "canvasSize", value: 5, type: "Vector", isArray: false, isDeprecated: false },
       { name: "devicePixelRatio", value: 4, type: "uint", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CodeOutputLayer",
+    fields: [
+      { name: "node", value: 1, type: "NodeChange", isArray: false, isDeprecated: false },
+      { name: "sourceNodeId", value: 2, type: "GUID", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CodeSnapshotLayers",
+    fields: [
+      { name: "state", value: 1, type: "CodeSnapshotState", isArray: false, isDeprecated: false },
+      { name: "invalidatedAt", value: 2, type: "uint", isArray: false, isDeprecated: false },
+      { name: "cachedPreviewStatus", value: 4, type: "CachedPreviewStatus", isArray: false, isDeprecated: false },
+      { name: "layers", value: 3, type: "CodeOutputLayer", isArray: true, isDeprecated: false },
     ],
   },
   {
@@ -3318,6 +3727,7 @@ export const figKiwiSchema = {
       { name: "showControls", value: 4, type: "bool", isArray: false, isDeprecated: false },
       { name: "startTimeMs", value: 5, type: "uint", isArray: false, isDeprecated: false },
       { name: "endTimeMs", value: 6, type: "uint", isArray: false, isDeprecated: false },
+      { name: "playbackRate", value: 7, type: "float", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3447,6 +3857,25 @@ export const figKiwiSchema = {
       { name: "PATH_TRIM_START", value: 54, type: null, isArray: false, isDeprecated: false },
       { name: "PATH_TRIM_END", value: 55, type: null, isArray: false, isDeprecated: false },
       { name: "DISSOLVE_PROGRESS", value: 56, type: null, isArray: false, isDeprecated: false },
+      { name: "EASING_DATA", value: 57, type: null, isArray: false, isDeprecated: false },
+      { name: "MEDIA_CURRENT_TIME", value: 58, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSFORM_3D_PERSPECTIVE", value: 59, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSFORM_3D_TRANSLATION_Z", value: 60, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSFORM_3D_ROTATION_X", value: 61, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSFORM_3D_ROTATION_Y", value: 62, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSFORM_3D_ROTATION_Z", value: 63, type: null, isArray: false, isDeprecated: false },
+      { name: "POLYGON_COUNT", value: 64, type: null, isArray: false, isDeprecated: false },
+      { name: "ARC_DATA_STARTING_ANGLE", value: 65, type: null, isArray: false, isDeprecated: false },
+      { name: "ARC_DATA_ENDING_ANGLE", value: 66, type: null, isArray: false, isDeprecated: false },
+      { name: "ARC_DATA_INNER_RADIUS", value: 67, type: null, isArray: false, isDeprecated: false },
+      { name: "KEYFRAME_VALUE", value: 68, type: null, isArray: false, isDeprecated: false },
+      { name: "MOTION_TRANSLATION_XY", value: 69, type: null, isArray: false, isDeprecated: false },
+      { name: "MOTION_SCALE_XY", value: 70, type: null, isArray: false, isDeprecated: false },
+      { name: "SCENE_3D_PERSPECTIVE", value: 71, type: null, isArray: false, isDeprecated: false },
+      { name: "STAR_INNER_SCALE", value: 72, type: null, isArray: false, isDeprecated: false },
+      { name: "MOTION_TRANSFORM_ORIGIN_XY", value: 73, type: null, isArray: false, isDeprecated: false },
+      { name: "MOTION_TRANSFORM_ORIGIN_X", value: 74, type: null, isArray: false, isDeprecated: false },
+      { name: "MOTION_TRANSFORM_ORIGIN_Y", value: 75, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3705,6 +4134,9 @@ export const figKiwiSchema = {
       { name: "varValue", value: 9, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "parameterConfig", value: 10, type: "ParameterConfig", isArray: false, isDeprecated: false },
       { name: "description", value: 11, type: "string", isArray: false, isDeprecated: false },
+      { name: "slotPropConfig", value: 12, type: "SlotPropConfig", isArray: false, isDeprecated: false },
+      { name: "colorArrayConfig", value: 13, type: "ColorArrayConfig", isArray: false, isDeprecated: false },
+      { name: "visibleWhen", value: 14, type: "ComponentPropVisibilityClause", isArray: true, isDeprecated: false },
     ],
   },
   {
@@ -3715,6 +4147,15 @@ export const figKiwiSchema = {
       { name: "guidValue", value: 3, type: "GUID", isArray: false, isDeprecated: false },
       { name: "floatValue", value: 4, type: "float", isArray: false, isDeprecated: false },
       { name: "easingData", value: 5, type: "EasingData", isArray: false, isDeprecated: false },
+      { name: "vectorValue", value: 6, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "lineValue", value: 7, type: "Line", isArray: false, isDeprecated: false },
+      { name: "circleValue", value: 8, type: "Circle", isArray: false, isDeprecated: false },
+      { name: "rotation3DValue", value: 9, type: "Rotation3D", isArray: false, isDeprecated: false },
+      { name: "circlePointValue", value: 10, type: "CirclePoint", isArray: false, isDeprecated: false },
+      { name: "gradientValue", value: 11, type: "Gradient", isArray: false, isDeprecated: false },
+      { name: "colorPointValue", value: 12, type: "ColorPoint", isArray: false, isDeprecated: false },
+      { name: "colorArrayValue", value: 13, type: "ColorArray", isArray: false, isDeprecated: false },
+      { name: "paintValue", value: 14, type: "Paint", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3723,6 +4164,10 @@ export const figKiwiSchema = {
       { name: "durationUs", value: 1, type: "uint64", isArray: false, isDeprecated: false },
       { name: "defaultTimeline", value: 2, type: "bool", isArray: false, isDeprecated: false },
       { name: "parentTimelineDefId", value: 3, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "playbackStyle", value: 4, type: "PlaybackStyle", isArray: false, isDeprecated: false },
+      { name: "autoplay", value: 5, type: "bool", isArray: false, isDeprecated: false },
+      { name: "keyframeSnappingFps", value: 6, type: "FrameRate", isArray: false, isDeprecated: false },
+      { name: "quantizePlayback", value: 7, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3750,6 +4195,7 @@ export const figKiwiSchema = {
     fields: [
       { name: "offsetUs", value: 1, type: "int64", isArray: false, isDeprecated: false },
       { name: "disabled", value: 2, type: "bool", isArray: false, isDeprecated: false },
+      { name: "autoplay", value: 3, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3777,6 +4223,15 @@ export const figKiwiSchema = {
       { name: "IMAGE", value: 6, type: null, isArray: false, isDeprecated: false },
       { name: "SLOT", value: 7, type: null, isArray: false, isDeprecated: false },
       { name: "EASING", value: 8, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_ARRAY", value: 9, type: null, isArray: false, isDeprecated: false },
+      { name: "VECTOR", value: 10, type: null, isArray: false, isDeprecated: false },
+      { name: "LINE", value: 11, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE", value: 12, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATION_3D", value: 13, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE_POINT", value: 14, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT", value: 15, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_POINT", value: 16, type: null, isArray: false, isDeprecated: false },
+      { name: "PAINT", value: 17, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3784,6 +4239,27 @@ export const figKiwiSchema = {
     fields: [
       { name: "stringValues", value: 1, type: "string", isArray: true, isDeprecated: false },
       { name: "instanceSwapValues", value: 2, type: "InstanceSwapPreferredValue", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ComponentPropVisibilityClause",
+    fields: [
+      { name: "siblingPropDefMatches", value: 1, type: "ComponentPropSiblingMatch", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ComponentPropSiblingMatch",
+    fields: [
+      { name: "propName", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "anyOf", value: 2, type: "ComponentPropVisibilityValue", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ComponentPropVisibilityValue",
+    fields: [
+      { name: "stringValue", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "floatValue", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "boolValue", value: 3, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3795,6 +4271,13 @@ export const figKiwiSchema = {
       { name: "label", value: 4, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "inputConfig", value: 5, type: "InputConfig", isArray: false, isDeprecated: false },
       { name: "selectConfig", value: 6, type: "SelectConfig", isArray: false, isDeprecated: false },
+      { name: "pointConfig", value: 7, type: "PointConfig", isArray: false, isDeprecated: false },
+      { name: "lineConfig", value: 8, type: "LineConfig", isArray: false, isDeprecated: false },
+      { name: "pointRadiusConfig", value: 9, type: "PointRadiusConfig", isArray: false, isDeprecated: false },
+      { name: "rotation3DConfig", value: 10, type: "Rotation3DConfig", isArray: false, isDeprecated: false },
+      { name: "circlePointConfig", value: 11, type: "CirclePointConfig", isArray: false, isDeprecated: false },
+      { name: "colorPointConfig", value: 12, type: "ColorPointConfig", isArray: false, isDeprecated: false },
+      { name: "showDividerAbove", value: 13, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3812,6 +4295,7 @@ export const figKiwiSchema = {
       { name: "unit", value: 1, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "min", value: 2, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "max", value: 3, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "icon", value: 4, type: "string", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3820,6 +4304,121 @@ export const figKiwiSchema = {
       { name: "min", value: 1, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "max", value: 2, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "step", value: 3, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "unit", value: 4, type: "VariableData", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "PointMode",
+    fields: [
+      { name: "CANVAS_AND_UI", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "CANVAS", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "UI", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "PointConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+      { name: "unit", value: 2, type: "NumberUnits", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Line",
+    fields: [
+      { name: "a", value: 1, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "b", value: 2, type: "Vector", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "LineConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+      { name: "unit", value: 2, type: "NumberUnits", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Circle",
+    fields: [
+      { name: "center", value: 1, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "radius", value: 2, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "PointRadiusConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+      { name: "positionUnit", value: 2, type: "NumberUnits", isArray: false, isDeprecated: false },
+      { name: "radiusUnit", value: 3, type: "NumberUnits", isArray: false, isDeprecated: false },
+      { name: "minRadius", value: 4, type: "float", isArray: false, isDeprecated: false },
+      { name: "maxRadius", value: 5, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Rotation3D",
+    fields: [
+      { name: "x", value: 1, type: "float", isArray: false, isDeprecated: false },
+      { name: "y", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "z", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "translateZ", value: 4, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Rotation3DConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CirclePoint",
+    fields: [
+      { name: "center", value: 1, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "radius", value: 2, type: "float", isArray: false, isDeprecated: false },
+      { name: "angle", value: 3, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CirclePointConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+      { name: "positionUnit", value: 2, type: "NumberUnits", isArray: false, isDeprecated: false },
+      { name: "radiusUnit", value: 3, type: "NumberUnits", isArray: false, isDeprecated: false },
+      { name: "minRadius", value: 4, type: "float", isArray: false, isDeprecated: false },
+      { name: "maxRadius", value: 5, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ColorPoint",
+    fields: [
+      { name: "point", value: 1, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "color", value: 2, type: "VariableData", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ColorPointConfig",
+    fields: [
+      { name: "mode", value: 1, type: "PointMode", isArray: false, isDeprecated: false },
+      { name: "unit", value: 2, type: "NumberUnits", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Gradient",
+    fields: [
+      { name: "stops", value: 1, type: "GradientStop", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "GradientStop",
+    fields: [
+      { name: "position", value: 1, type: "float", isArray: false, isDeprecated: false },
+      { name: "color", value: 2, type: "VariableData", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "GradientParameterValue",
+    fields: [
+      { name: "stops", value: 1, type: "ColorStop", isArray: true, isDeprecated: false },
+      { name: "transform", value: 2, type: "Matrix", isArray: false, isDeprecated: false },
+      { name: "opacity", value: 3, type: "float", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3827,12 +4426,30 @@ export const figKiwiSchema = {
     fields: [
       { name: "value", value: 1, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "label", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "icon", value: 3, type: "string", isArray: false, isDeprecated: false },
     ],
   },
   {
     kind: "MESSAGE", name: "SelectConfig",
     fields: [
       { name: "options", value: 1, type: "SelectOption", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ColorArrayConfig",
+    fields: [
+      { name: "minLength", value: 1, type: "uint", isArray: false, isDeprecated: false },
+      { name: "maxLength", value: 2, type: "uint", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "SlotPropConfig",
+    fields: [
+      { name: "stretchChildOnInsert", value: 1, type: "bool", isArray: false, isDeprecated: false },
+      { name: "displayByDefault", value: 2, type: "bool", isArray: false, isDeprecated: false },
+      { name: "minChildren", value: 3, type: "uint", isArray: false, isDeprecated: false },
+      { name: "maxChildren", value: 4, type: "uint", isArray: false, isDeprecated: false },
+      { name: "allowPreferredValuesOnly", value: 5, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -3961,6 +4578,33 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "ENUM", name: "SpecBlockType",
+    fields: [
+      { name: "DEFAULT", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "PARAGRAPH", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_1", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_2", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_3", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_4", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_5", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "HEADING_6", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "CODE_BLOCK", value: 8, type: null, isArray: false, isDeprecated: false },
+      { name: "BLOCK_QUOTE", value: 9, type: null, isArray: false, isDeprecated: false },
+      { name: "HORIZONTAL_RULE", value: 10, type: null, isArray: false, isDeprecated: false },
+      { name: "ORDERED_LIST_ITEM", value: 11, type: null, isArray: false, isDeprecated: false },
+      { name: "UNORDERED_LIST_ITEM", value: 12, type: null, isArray: false, isDeprecated: false },
+      { name: "DOCUMENT", value: 13, type: null, isArray: false, isDeprecated: false },
+      { name: "TABLE", value: 14, type: null, isArray: false, isDeprecated: false },
+      { name: "TABLE_ROW", value: 15, type: null, isArray: false, isDeprecated: false },
+      { name: "TABLE_CELL", value: 16, type: null, isArray: false, isDeprecated: false },
+      { name: "TODO_LIST_ITEM_UNCHECKED", value: 17, type: null, isArray: false, isDeprecated: false },
+      { name: "TODO_LIST_ITEM_CHECKED", value: 18, type: null, isArray: false, isDeprecated: false },
+      { name: "IMAGE", value: 19, type: null, isArray: false, isDeprecated: false },
+      { name: "EMBED", value: 20, type: null, isArray: false, isDeprecated: false },
+      { name: "EMBEDDED_CANVAS", value: 21, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "ENUM", name: "InternalEnumForTest",
     fields: [
       { name: "OLD", value: 1, type: null, isArray: false, isDeprecated: false },
@@ -3977,6 +4621,24 @@ export const figKiwiSchema = {
     fields: [
       { name: "property", value: 1, type: "string", isArray: false, isDeprecated: false },
       { name: "values", value: 2, type: "string", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "BackfillError",
+    fields: [
+      { name: "NONE", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "TRANSIENT_RETRYING", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "PERMANENTLY_FAILED", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "PASTE_FAILED", value: 3, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "PartialPasteAnnotation",
+    fields: [
+      { name: "isPartial", value: 1, type: "bool", isArray: false, isDeprecated: false },
+      { name: "annotatedAt", value: 2, type: "uint64", isArray: false, isDeprecated: false },
+      { name: "errorState", value: 3, type: "BackfillError", isArray: false, isDeprecated: false },
+      { name: "upserted", value: 4, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4077,6 +4739,7 @@ export const figKiwiSchema = {
       { name: "voiceEventPhrase", value: 5, type: "string", isArray: false, isDeprecated: false },
       { name: "transitionTimeout", value: 6, type: "float", isArray: false, isDeprecated: false },
       { name: "mediaHitTime", value: 7, type: "float", isArray: false, isDeprecated: false },
+      { name: "transitionTimeoutVar", value: 8, type: "VariableData", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4100,8 +4763,13 @@ export const figKiwiSchema = {
       { name: "transitionType", value: 2, type: "TransitionType", isArray: false, isDeprecated: false },
       { name: "transitionDuration", value: 3, type: "float", isArray: false, isDeprecated: false },
       { name: "easingType", value: 4, type: "EasingType", isArray: false, isDeprecated: false },
+      { name: "transitionDurationVar", value: 46, type: "VariableData", isArray: false, isDeprecated: false },
+      { name: "easingVar", value: 47, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "transitionTimeout", value: 5, type: "float", isArray: false, isDeprecated: false },
       { name: "transitionShouldSmartAnimate", value: 6, type: "bool", isArray: false, isDeprecated: false },
+      { name: "enableJitSmartAnimate", value: 43, type: "bool", isArray: false, isDeprecated: false },
+      { name: "interpolationColorSpace", value: 44, type: "InterpolationColorSpace", isArray: false, isDeprecated: false },
+      { name: "interpolationHueMethod", value: 45, type: "InterpolationHueMethod", isArray: false, isDeprecated: false },
       { name: "connectionType", value: 7, type: "ConnectionType", isArray: false, isDeprecated: false },
       { name: "overlayRelativePosition", value: 9, type: "Vector", isArray: false, isDeprecated: false },
       { name: "navigationType", value: 10, type: "NavigationType", isArray: false, isDeprecated: false },
@@ -4110,6 +4778,7 @@ export const figKiwiSchema = {
       { name: "extraScrollOffset", value: 13, type: "Vector", isArray: false, isDeprecated: false },
       { name: "transitionResetScrollPosition", value: 25, type: "bool", isArray: false, isDeprecated: false },
       { name: "transitionResetInteractiveComponents", value: 26, type: "bool", isArray: false, isDeprecated: false },
+      { name: "transitionOverridesEnabled", value: 42, type: "bool", isArray: false, isDeprecated: false },
       { name: "connectionURL", value: 8, type: "string", isArray: false, isDeprecated: false },
       { name: "openUrlInNewTab", value: 18, type: "bool", isArray: false, isDeprecated: false },
       { name: "linkParam", value: 34, type: "VariableData", isArray: false, isDeprecated: false },
@@ -4211,6 +4880,7 @@ export const figKiwiSchema = {
     fields: [
       { name: "DEFAULT", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "COPY_DUPLICATE", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "SILENT_INSERT", value: 2, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4343,6 +5013,17 @@ export const figKiwiSchema = {
       { name: "isPlayingSound", value: 3, type: "bool", isArray: false, isDeprecated: false },
       { name: "currentTimes", value: 4, type: "uint", isArray: true, isDeprecated: false },
       { name: "actionTakenTimestamp", value: 5, type: "uint", isArray: false, isDeprecated: false },
+      { name: "playbackRate", value: 6, type: "float", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "TimelinePlaybackStateData",
+    fields: [
+      { name: "status", value: 1, type: "uint", isArray: false, isDeprecated: false },
+      { name: "playbackTimeUs", value: 2, type: "uint64", isArray: false, isDeprecated: false },
+      { name: "timelineRootId", value: 3, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "timelineDefId", value: 4, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "focusedSubtimelineRootId", value: 5, type: "GUID", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4481,6 +5162,12 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "MESSAGE", name: "SanrioCharacter",
+    fields: [
+      { name: "character", value: 1, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "ENUM", name: "Heartbeat",
     fields: [
       { name: "FOREGROUND", value: 0, type: null, isArray: false, isDeprecated: false },
@@ -4504,6 +5191,28 @@ export const figKiwiSchema = {
       { name: "NONE", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "DESIGN_SYSTEM", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "VARIABLES", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AgentInfo",
+    fields: [
+      { name: "name", value: 1, type: "string", isArray: false, isDeprecated: false },
+      { name: "logo", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "oauthClientId", value: 3, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "AgentActivityStatus",
+    fields: [
+      { name: "RUNNING", value: 1, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AgentCanvasActivity",
+    fields: [
+      { name: "nodeIds", value: 1, type: "GUID", isArray: true, isDeprecated: false },
+      { name: "status", value: 2, type: "AgentActivityStatus", isArray: false, isDeprecated: false },
+      { name: "triggeringUserId", value: 3, type: "string", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4554,6 +5263,11 @@ export const figKiwiSchema = {
       { name: "sitesViewState", value: 41, type: "SitesViewState", isArray: false, isDeprecated: false },
       { name: "nodeChatExchanges", value: 42, type: "NodeChatExchange", isArray: true, isDeprecated: false },
       { name: "designFullPageViewState", value: 45, type: "DesignFullPageViewState", isArray: false, isDeprecated: false },
+      { name: "agentInfo", value: 46, type: "AgentInfo", isArray: false, isDeprecated: false },
+      { name: "timelinePlaybackState", value: 47, type: "TimelinePlaybackStateData", isArray: true, isDeprecated: false },
+      { name: "agentCanvasActivity", value: 48, type: "AgentCanvasActivity", isArray: false, isDeprecated: false },
+      { name: "assistantThreadId", value: 49, type: "string", isArray: false, isDeprecated: false },
+      { name: "sanrioCharacter", value: 50, type: "SanrioCharacter", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4593,6 +5307,13 @@ export const figKiwiSchema = {
       { name: "DEFAULT", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "CONTAINING_PAGE", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "PLUGIN", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "SceneGraphQueryMode",
+    fields: [
+      { name: "ADD", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "SET", value: 1, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4669,6 +5390,18 @@ export const figKiwiSchema = {
     fields: [
       { name: "UNKNOWN", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "VARIABLE", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "STYLE_PROPERTIES", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "STYLE_PROPERTIES_FILL", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "STYLE_PROPERTIES_STROKE", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "STYLE_PROPERTIES_EFFECT", value: 5, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "NodeChangeOrder",
+    fields: [
+      { name: "GUID", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "PREORDER", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "TOPOLOGICAL", value: 2, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4718,6 +5451,10 @@ export const figKiwiSchema = {
       { name: "clientRenderedMetadata", value: 40, type: "ClientRenderedMetadata", isArray: false, isDeprecated: false },
       { name: "pasteAssetType", value: 41, type: "PasteAssetType", isArray: false, isDeprecated: false },
       { name: "objectAnimations", value: 43, type: "ObjectAnimationList", isArray: false, isDeprecated: false },
+      { name: "sceneGraphQueryMode", value: 45, type: "SceneGraphQueryMode", isArray: false, isDeprecated: false },
+      { name: "undoBatchPageIds", value: 46, type: "GUID", isArray: true, isDeprecated: false },
+      { name: "originFileKey", value: 47, type: "string", isArray: false, isDeprecated: false },
+      { name: "nodeChangeOrder", value: 48, type: "NodeChangeOrder", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4811,6 +5548,17 @@ export const figKiwiSchema = {
       { name: "KEYFRAME_TRACK_ID", value: 20, type: null, isArray: false, isDeprecated: false },
       { name: "KEYFRAME_TRACK_PARAMETER_DATA", value: 21, type: null, isArray: false, isDeprecated: false },
       { name: "EASING", value: 22, type: null, isArray: false, isDeprecated: false },
+      { name: "TIMING", value: 23, type: null, isArray: false, isDeprecated: false },
+      { name: "VECTOR", value: 24, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_ARRAY", value: 25, type: null, isArray: false, isDeprecated: false },
+      { name: "LINE", value: 26, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE", value: 27, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATION_3D", value: 28, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE_POINT", value: 29, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT", value: 30, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_POINT", value: 31, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT_PAINT", value: 32, type: null, isArray: false, isDeprecated: false },
+      { name: "PAINT", value: 33, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4831,6 +5579,17 @@ export const figKiwiSchema = {
       { name: "KEYFRAME_TRACK_ID", value: 13, type: null, isArray: false, isDeprecated: false },
       { name: "KEYFRAME_TRACK_PARAMETER_DATA", value: 14, type: null, isArray: false, isDeprecated: false },
       { name: "EASING", value: 15, type: null, isArray: false, isDeprecated: false },
+      { name: "TIMING", value: 16, type: null, isArray: false, isDeprecated: false },
+      { name: "VECTOR", value: 17, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_ARRAY", value: 18, type: null, isArray: false, isDeprecated: false },
+      { name: "LINE", value: 19, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE", value: 20, type: null, isArray: false, isDeprecated: false },
+      { name: "ROTATION_3D", value: 21, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE_POINT", value: 22, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT", value: 23, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_POINT", value: 24, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT_PAINT", value: 25, type: null, isArray: false, isDeprecated: false },
+      { name: "PAINT", value: 26, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4857,6 +5616,16 @@ export const figKiwiSchema = {
       { name: "keyframeTrackIdValue", value: 19, type: "KeyframeTrackId", isArray: false, isDeprecated: false },
       { name: "keyframeTrackParameterValue", value: 20, type: "KeyframeTrackParameterValue", isArray: false, isDeprecated: false },
       { name: "easingValue", value: 21, type: "EasingData", isArray: false, isDeprecated: false },
+      { name: "vectorValue", value: 22, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "colorArrayValue", value: 23, type: "ColorArray", isArray: false, isDeprecated: false },
+      { name: "lineValue", value: 24, type: "Line", isArray: false, isDeprecated: false },
+      { name: "circleValue", value: 25, type: "Circle", isArray: false, isDeprecated: false },
+      { name: "rotation3DValue", value: 26, type: "Rotation3D", isArray: false, isDeprecated: false },
+      { name: "circlePointValue", value: 27, type: "CirclePoint", isArray: false, isDeprecated: false },
+      { name: "gradientValue", value: 28, type: "Gradient", isArray: false, isDeprecated: false },
+      { name: "colorPointValue", value: 29, type: "ColorPoint", isArray: false, isDeprecated: false },
+      { name: "gradientParameterValue", value: 30, type: "GradientParameterValue", isArray: false, isDeprecated: false },
+      { name: "paintValue", value: 31, type: "Paint", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4882,6 +5651,8 @@ export const figKiwiSchema = {
       { name: "NEGATE", value: 17, type: null, isArray: false, isDeprecated: false },
       { name: "IS_TRUTHY", value: 18, type: null, isArray: false, isDeprecated: false },
       { name: "KEYFRAME", value: 19, type: null, isArray: false, isDeprecated: false },
+      { name: "COMPOSE_COLOR", value: 20, type: null, isArray: false, isDeprecated: false },
+      { name: "PAINT_TO_COLOR", value: 21, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -4903,6 +5674,12 @@ export const figKiwiSchema = {
     kind: "MESSAGE", name: "VariableMap",
     fields: [
       { name: "values", value: 1, type: "VariableMapValue", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ColorArray",
+    fields: [
+      { name: "colors", value: 1, type: "VariableData", isArray: true, isDeprecated: false },
     ],
   },
   {
@@ -5018,6 +5795,20 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "MESSAGE", name: "ToolId",
+    fields: [
+      { name: "guid", value: 1, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "assetRef", value: 2, type: "AssetRef", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CustomEffectId",
+    fields: [
+      { name: "guid", value: 1, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "assetRef", value: 2, type: "AssetRef", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "MESSAGE", name: "TRSSTransform2D",
     fields: [
       { name: "translation", value: 1, type: "Vector", isArray: false, isDeprecated: false },
@@ -5083,6 +5874,7 @@ export const figKiwiSchema = {
       { name: "PARAGRAPH_INDENT", value: 20, type: null, isArray: false, isDeprecated: false },
       { name: "FONT_VARIATIONS", value: 21, type: null, isArray: false, isDeprecated: false },
       { name: "TRANSFORM", value: 22, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_OPACITY", value: 23, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5091,6 +5883,14 @@ export const figKiwiSchema = {
       { name: "floatValue", value: 1, type: "float", isArray: false, isDeprecated: false },
       { name: "colorValue", value: 2, type: "Color", isArray: false, isDeprecated: false },
       { name: "textDataValue", value: 3, type: "TextData", isArray: false, isDeprecated: false },
+      { name: "vectorValue", value: 4, type: "Vector", isArray: false, isDeprecated: false },
+      { name: "boolValue", value: 5, type: "bool", isArray: false, isDeprecated: false },
+      { name: "circleValue", value: 6, type: "Circle", isArray: false, isDeprecated: false },
+      { name: "lineValue", value: 7, type: "Line", isArray: false, isDeprecated: false },
+      { name: "circlePointValue", value: 8, type: "CirclePoint", isArray: false, isDeprecated: false },
+      { name: "colorPointValue", value: 9, type: "ColorPoint", isArray: false, isDeprecated: false },
+      { name: "gradientParameterValue", value: 10, type: "GradientParameterValue", isArray: false, isDeprecated: false },
+      { name: "paintValue", value: 11, type: "Paint", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5100,6 +5900,14 @@ export const figKiwiSchema = {
       { name: "INVALID", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "COLOR", value: 2, type: null, isArray: false, isDeprecated: false },
       { name: "TEXT_DATA", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "VECTOR", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "BOOL", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "LINE", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "CIRCLE_POINT", value: 8, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR_POINT", value: 9, type: null, isArray: false, isDeprecated: false },
+      { name: "GRADIENT_PAINT", value: 10, type: null, isArray: false, isDeprecated: false },
+      { name: "PAINT", value: 11, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5137,6 +5945,7 @@ export const figKiwiSchema = {
     fields: [
       { name: "manual", value: 1, type: "ManualKeyframeTrackParameter", isArray: false, isDeprecated: false },
       { name: "animationPreset", value: 2, type: "AnimationPresetKeyframeTrackParameter", isArray: false, isDeprecated: false },
+      { name: "animationStyleBindingId", value: 3, type: "GUID", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5162,6 +5971,52 @@ export const figKiwiSchema = {
     kind: "MESSAGE", name: "AnimationPresetData",
     fields: [
       { name: "animationPresetId", value: 1, type: "AnimationPresetId", isArray: false, isDeprecated: false },
+      { name: "timelineDefId", value: 2, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "sortPosition", value: 3, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "StyleAnimation",
+    fields: [
+      { name: "animationPresetId", value: 1, type: "AnimationPresetId", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "StyleIdForAnimation",
+    fields: [
+      { name: "id", value: 1, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "timelineDefId", value: 2, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "animationStyleId", value: 3, type: "StyleId", isArray: false, isDeprecated: false },
+      { name: "timelineOffset", value: 4, type: "int64", isArray: false, isDeprecated: false },
+      { name: "generatedAnimationPresets", value: 5, type: "GeneratedAnimationPreset", isArray: true, isDeprecated: false },
+      { name: "sortPosition", value: 6, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "GeneratedAnimationPreset",
+    fields: [
+      { name: "animationPresetId", value: 1, type: "AnimationPresetId", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "Tools",
+    fields: [
+      { name: "tools", value: 1, type: "ToolData", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "ToolData",
+    fields: [
+      { name: "toolId", value: 1, type: "ToolId", isArray: false, isDeprecated: false },
+      { name: "backingCodeComponentId", value: 2, type: "CodeComponentId", isArray: false, isDeprecated: false },
+      { name: "componentPropAssignments", value: 3, type: "ComponentPropAssignment", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "SpringType",
+    fields: [
+      { name: "NORMALIZED", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "PHYSICAL", value: 1, type: null, isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5170,6 +6025,7 @@ export const figKiwiSchema = {
       { name: "stiffness", value: 1, type: "float", isArray: false, isDeprecated: false },
       { name: "damping", value: 2, type: "float", isArray: false, isDeprecated: false },
       { name: "mass", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "springType", value: 4, type: "SpringType", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5197,6 +6053,8 @@ export const figKiwiSchema = {
       { name: "easing", value: 6, type: "EasingData", isArray: false, isDeprecated: false },
       { name: "easingVar", value: 7, type: "VariableData", isArray: false, isDeprecated: false },
       { name: "createdAtMs", value: 8, type: "uint64", isArray: false, isDeprecated: false },
+      { name: "interactionIDs", value: 9, type: "GUID", isArray: true, isDeprecated: false },
+      { name: "disabled", value: 10, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5236,6 +6094,42 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "ENUM", name: "KeyframeBindingEffectParametrizedField",
+    fields: [
+      { name: "MISSING", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "OFFSET_X", value: 1, type: null, isArray: false, isDeprecated: false },
+      { name: "OFFSET_Y", value: 2, type: null, isArray: false, isDeprecated: false },
+      { name: "RADIUS", value: 3, type: null, isArray: false, isDeprecated: false },
+      { name: "SPREAD", value: 4, type: null, isArray: false, isDeprecated: false },
+      { name: "COLOR", value: 5, type: null, isArray: false, isDeprecated: false },
+      { name: "REFRACTION_RADIUS", value: 6, type: null, isArray: false, isDeprecated: false },
+      { name: "SPECULAR_ANGLE", value: 7, type: null, isArray: false, isDeprecated: false },
+      { name: "SPECULAR_INTENSITY", value: 8, type: null, isArray: false, isDeprecated: false },
+      { name: "CHROMATIC_ABERRATION", value: 9, type: null, isArray: false, isDeprecated: false },
+      { name: "SPLAY", value: 10, type: null, isArray: false, isDeprecated: false },
+      { name: "REFRACTION_INTENSITY", value: 11, type: null, isArray: false, isDeprecated: false },
+      { name: "START_RADIUS", value: 12, type: null, isArray: false, isDeprecated: false },
+      { name: "START_OFFSET_X", value: 13, type: null, isArray: false, isDeprecated: false },
+      { name: "START_OFFSET_Y", value: 14, type: null, isArray: false, isDeprecated: false },
+      { name: "END_OFFSET_X", value: 15, type: null, isArray: false, isDeprecated: false },
+      { name: "END_OFFSET_Y", value: 16, type: null, isArray: false, isDeprecated: false },
+      { name: "NOISE_SIZE_X", value: 17, type: null, isArray: false, isDeprecated: false },
+      { name: "NOISE_SIZE_Y", value: 18, type: null, isArray: false, isDeprecated: false },
+      { name: "DENSITY", value: 19, type: null, isArray: false, isDeprecated: false },
+      { name: "EFFECT_OPACITY", value: 20, type: null, isArray: false, isDeprecated: false },
+      { name: "SECONDARY_COLOR", value: 21, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "NodeContentsKeyframeBindingLocation",
+    fields: [
+      { name: "topLevelField", value: 1, type: "TransitionOverrideBindingTopLevelField", isArray: false, isDeprecated: false },
+      { name: "parameterFieldValue", value: 2, type: "VariableField", isArray: false, isDeprecated: false },
+      { name: "index", value: 3, type: "int", isArray: false, isDeprecated: false },
+      { name: "effectParametrizedFieldValue", value: 4, type: "KeyframeBindingEffectParametrizedField", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "MESSAGE", name: "TransitionOverridePropMap",
     fields: [
       { name: "entries", value: 1, type: "TransitionOverridePropMapEntry", isArray: true, isDeprecated: false },
@@ -5247,6 +6141,7 @@ export const figKiwiSchema = {
       { name: "prop", value: 1, type: "TransitionOverrideProp", isArray: false, isDeprecated: false },
       { name: "overrides", value: 2, type: "TransitionOverride", isArray: true, isDeprecated: false },
       { name: "bindingLocation", value: 3, type: "TransitionOverrideBindingLocation", isArray: false, isDeprecated: false },
+      { name: "nodeContentsBindingLocation", value: 4, type: "NodeContentsKeyframeBindingLocation", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5616,6 +6511,13 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "MESSAGE", name: "ClipboardTextRange",
+    fields: [
+      { name: "start", value: 1, type: "int", isArray: false, isDeprecated: false },
+      { name: "end", value: 2, type: "int", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "MESSAGE", name: "ClipboardSelectionRegion",
     fields: [
       { name: "parent", value: 1, type: "GUID", isArray: false, isDeprecated: false },
@@ -5623,6 +6525,7 @@ export const figKiwiSchema = {
       { name: "enclosingFrameOffset", value: 3, type: "Vector", isArray: false, isDeprecated: false },
       { name: "pasteIsPartiallyOutsideEnclosingFrame", value: 4, type: "bool", isArray: false, isDeprecated: false },
       { name: "focusType", value: 5, type: "SelectionRegionFocusType", isArray: false, isDeprecated: false },
+      { name: "textRange", value: 6, type: "ClipboardTextRange", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -5844,6 +6747,18 @@ export const figKiwiSchema = {
       { name: "trackingSessionId", value: 2, type: "string", isArray: false, isDeprecated: false },
       { name: "trackingSessionSequenceId", value: 3, type: "uint", isArray: false, isDeprecated: false },
       { name: "reconnectID", value: 4, type: "string", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CustomEffects",
+    fields: [
+      { name: "customEffects", value: 1, type: "CustomEffectData", isArray: true, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "CustomEffectData",
+    fields: [
+      { name: "customEffectId", value: 1, type: "CustomEffectId", isArray: false, isDeprecated: false },
     ],
   },
   {
@@ -6176,6 +7091,13 @@ export const figKiwiSchema = {
     ],
   },
   {
+    kind: "MESSAGE", name: "FrameRate",
+    fields: [
+      { name: "numerator", value: 1, type: "uint", isArray: false, isDeprecated: false },
+      { name: "denominator", value: 2, type: "uint", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
     kind: "ENUM", name: "InterpolationType",
     fields: [
       { name: "HOLD", value: 0, type: null, isArray: false, isDeprecated: false },
@@ -6213,6 +7135,39 @@ export const figKiwiSchema = {
       { name: "ONCE", value: 0, type: null, isArray: false, isDeprecated: false },
       { name: "LOOP", value: 1, type: null, isArray: false, isDeprecated: false },
       { name: "BOOMERANG", value: 2, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "ENUM", name: "TrackLoopMode",
+    fields: [
+      { name: "NONE", value: 0, type: null, isArray: false, isDeprecated: false },
+      { name: "LOOP", value: 1, type: null, isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AudioFill",
+    fields: [
+      { name: "id", value: 1, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "mediaHash", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "timelineOffsetUs", value: 3, type: "int64", isArray: false, isDeprecated: false },
+      { name: "startTimeUs", value: 4, type: "int64", isArray: false, isDeprecated: false },
+      { name: "durationUs", value: 5, type: "int64", isArray: false, isDeprecated: false },
+      { name: "volume", value: 6, type: "float", isArray: false, isDeprecated: false },
+      { name: "mute", value: 7, type: "bool", isArray: false, isDeprecated: false },
+      { name: "displayName", value: 8, type: "string", isArray: false, isDeprecated: false },
+      { name: "loopEnabled", value: 9, type: "bool", isArray: false, isDeprecated: false },
+      { name: "playbackDurationUs", value: 10, type: "int64", isArray: false, isDeprecated: false },
+      { name: "trackId", value: 11, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "loopPhaseOffsetUs", value: 12, type: "int64", isArray: false, isDeprecated: false },
+    ],
+  },
+  {
+    kind: "MESSAGE", name: "AudioTrack",
+    fields: [
+      { name: "id", value: 1, type: "GUID", isArray: false, isDeprecated: false },
+      { name: "name", value: 2, type: "string", isArray: false, isDeprecated: false },
+      { name: "gain", value: 3, type: "float", isArray: false, isDeprecated: false },
+      { name: "mute", value: 4, type: "bool", isArray: false, isDeprecated: false },
     ],
   },
   ],

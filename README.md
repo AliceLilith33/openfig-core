@@ -112,7 +112,7 @@ walk(doc, page, (node, depth) => {
 
 ## Wire-format types
 
-`Kiwi` holds a TypeScript type for every definition in the `.fig` schema (550 of them), generated from `src/utilities/figKiwiSchema.ts`:
+`Kiwi` holds a TypeScript type for every definition in the `.fig` schema (631 of them), generated from `src/utilities/figKiwiSchema.ts`:
 
 ```ts
 import type { Kiwi } from 'openfig-core';

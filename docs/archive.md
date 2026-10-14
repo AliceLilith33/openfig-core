@@ -80,7 +80,7 @@ Chunks repeat until end of file. Typically there are 2 chunks, occasionally 3+.
 
 Decode with `decodeBinarySchema()` from the `kiwi-schema` package, then compile with `compileSchema()` to get encode/decode functions.
 
-When roundtripping an existing file, preserve and re-use the schema from that file. When writing from scratch, use `figKiwiSchema.ts` — our own 550-def TypeScript schema.
+When roundtripping an existing file, preserve and re-use the schema from that file. When writing from scratch, use `figKiwiSchema.ts` — our own 631-def TypeScript schema.
 
 ### Chunk 1 — Message Data
 
@@ -192,4 +192,4 @@ doc.message.nodeChanges.push({
 // Encode and save...
 ```
 
-The bundled schema is ~26KB (deflate-compressed kiwi binary) generated from `figKiwiSchema.ts` — our own TypeScript expression of all 550 type definitions needed for full .fig compatibility. See [template.md](template.md) for details.
+The bundled schema is ~26KB (deflate-compressed kiwi binary), generated from an earlier, 550-definition version of `figKiwiSchema.ts` — our own TypeScript expression of the .fig type definitions (631 in the current version). See [template.md](template.md) for details.

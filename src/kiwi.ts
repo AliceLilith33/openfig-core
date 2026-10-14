@@ -116,7 +116,11 @@ export type NodeType =
   | "KEYFRAME_TRACK"
   | "ANIMATION_PRESET_INSTANCE"
   | "CODE_EMBED"
-  | "BINARY_FILE";
+  | "BINARY_FILE"
+  | "SPEC_BLOCK"
+  | "TOOL_INSTANCE"
+  | "CUSTOM_EFFECT_INSTANCE"
+  | "NATIVE_CODE_LAYER_INSTANCE";
 
 export type ShapeWithTextType =
   | "SQUARE"
@@ -181,7 +185,8 @@ export type PaintType =
   | "EMOJI"
   | "VIDEO"
   | "PATTERN"
-  | "NOISE";
+  | "NOISE"
+  | "CUSTOM";
 
 export type ImageScaleMode =
   | "STRETCH"
@@ -198,7 +203,8 @@ export type EffectType =
   | "SYMMETRY"
   | "GRAIN"
   | "NOISE"
-  | "GLASS";
+  | "GLASS"
+  | "CUSTOM";
 
 export type TextCase =
   | "ORIGINAL"
@@ -239,7 +245,8 @@ export type ConstraintType =
 export type StrokeAlign =
   | "CENTER"
   | "INSIDE"
-  | "OUTSIDE";
+  | "OUTSIDE"
+  | "OFFSET";
 
 export type StrokeCap =
   | "NONE"
@@ -260,7 +267,9 @@ export type StrokeCap =
   | "ERD_ZERO_OR_ONE"
   | "ERD_EXACTLY_ONE"
   | "ERD_ZERO_OR_MORE"
-  | "ERD_ONE_OR_MORE";
+  | "ERD_ONE_OR_MORE"
+  | "ERD_ONE"
+  | "ERD_MANY";
 
 export type StrokeJoin =
   | "MITER"
@@ -311,7 +320,11 @@ export type ImageType =
   | "JPEG"
   | "SVG"
   | "PDF"
-  | "MP4";
+  | "MP4"
+  | "GIF"
+  | "WEBM"
+  | "LOTTIE"
+  | "DOTLOTTIE";
 
 export type ExportConstraintType =
   | "CONTENT_SCALE"
@@ -336,6 +349,11 @@ export type TextAutoResize =
 export type TextTruncation =
   | "DISABLED"
   | "ENDING";
+
+export type TextWrapStyle =
+  | "AUTO"
+  | "BALANCE"
+  | "PRETTY";
 
 export type StyleSetType =
   | "PERSONAL"
@@ -374,7 +392,9 @@ export type StackJustify =
   | "CENTER"
   | "MAX"
   | "SPACE_EVENLY"
-  | "SPACE_BETWEEN";
+  | "SPACE_BETWEEN"
+  | "SPACE_AROUND"
+  | "SPACE_EVENLY_CSS";
 
 export type GridChildAlign =
   | "AUTO"
@@ -476,7 +496,9 @@ export type EasingType =
   | "CUSTOM_SPRING"
   | "SPRING_PRESET_ONE"
   | "SPRING_PRESET_TWO"
-  | "SPRING_PRESET_THREE";
+  | "SPRING_PRESET_THREE"
+  | "HOLD"
+  | "EASE_IN";
 
 export type ScrollDirection =
   | "NONE"
@@ -520,6 +542,28 @@ export interface ColorStop {
 export interface ColorStopVar {
   color?: Color;
   colorVar?: VariableData;
+  position?: number;
+}
+
+export type ColorSpace =
+  | "DEFAULT"
+  | "SRGB"
+  | "DISPLAY_P3"
+  | "HSL"
+  | "HSB"
+  | "OKLAB"
+  | "OKLCH";
+
+export interface AuthoredColor {
+  space?: ColorSpace;
+  c0?: number;
+  c1?: number;
+  c2?: number;
+  c3?: number;
+}
+
+export interface AuthoredColorStop {
+  authoredColor?: AuthoredColor;
   position?: number;
 }
 
@@ -596,11 +640,43 @@ export type CodeSnapshotState =
   | "SNAPSHOT_ERROR"
   | "LLM_IN_PROGRESS";
 
+export type CachedPreviewStatus =
+  | "UNKNOWN"
+  | "PENDING"
+  | "COMPLETE"
+  | "FAILED"
+  | "ERROR";
+
+export type SnapshotCaptureMode =
+  | "FULL"
+  | "PARTIAL";
+
+export interface CodeSourceInfo {
+  originReferenceId?: string;
+  originNodeId?: GUID;
+  linkedSnapshotId?: GUID;
+  captureMode?: SnapshotCaptureMode;
+  sourceBlobRef?: string;
+  sourceElementId?: string;
+}
+
 export type CodeObjectType =
   | "WEB_LAYER"
   | "WEB_INTERACTION"
   | "NATIVE_LAYER"
-  | "ANIMATION_PRESET";
+  | "ANIMATION_PRESET"
+  | "TOOL"
+  | "CUSTOM_EFFECT"
+  | "PLUGIN"
+  | "WEB_LAYER_GENERIC"
+  | "CUSTOM_FILL";
+
+export interface CustomToolArtifactRef {
+  customToolId?: string;
+  customToolVersion?: string;
+  publishedCustomToolId?: string;
+  publishedCustomToolVersionId?: string;
+}
 
 export type LockMode =
   | "NONE"
@@ -868,6 +944,16 @@ export interface PasteSource {
   srcNode?: GUID;
 }
 
+export interface WeaveConnection {
+  workflowId?: string;
+  nodeId?: string;
+}
+
+export interface WeaveLayerConnection {
+  weaveVariableId?: string;
+  paintId?: string;
+}
+
 export interface FilterColorAdjust {
   tint: number;
   shadows: number;
@@ -918,6 +1004,8 @@ export interface Paint {
   colorVar?: VariableData;
   imageVar?: VariableData;
   stopsVar?: ColorStopVar[];
+  gradientVar?: VariableData;
+  paintVar?: VariableData;
   thumbHashBase64?: string;
   thumbHash?: Uint8Array;
   sourceNodeId?: GUID;
@@ -931,7 +1019,26 @@ export interface Paint {
   noiseType?: NoiseType;
   density?: number;
   noiseSize?: Vector;
+  customEffectId?: CodeComponentId;
+  componentPropAssignments?: ComponentPropAssignment[];
+  interpolationColorSpace?: InterpolationColorSpace;
+  interpolationHueMethod?: InterpolationHueMethod;
+  authoredColor?: AuthoredColor;
+  authoredStops?: AuthoredColorStop[];
 }
+
+export type InterpolationColorSpace =
+  | "DEFAULT"
+  | "OKLAB"
+  | "OKLCH"
+  | "HSL"
+  | "SRGB_LINEAR";
+
+export type InterpolationHueMethod =
+  | "SHORTER"
+  | "LONGER"
+  | "INCREASING"
+  | "DECREASING";
 
 export type NoiseType =
   | "MULTITONE"
@@ -1239,6 +1346,8 @@ export interface CollaborativePlainText {
   historyOpsWithLoc?: CollaborativeTextStrippedOpRunWithLoc[];
   historyStringContentBuffer?: Uint8Array;
   changesToAppend?: CollaborativeTextOpRun[];
+  snapshotText?: string;
+  snapshotVersion?: CollaborativeTextOpID[];
 }
 
 export interface CollaborativeTextSelection {
@@ -1369,6 +1478,8 @@ export interface Effect {
   startRadius?: number;
   color?: Color;
   secondaryColor?: Color;
+  authoredColor?: AuthoredColor;
+  secondaryAuthoredColor?: AuthoredColor;
   noiseSize?: Vector;
   seed?: number;
   clipToShape?: boolean;
@@ -1388,6 +1499,19 @@ export interface Effect {
   chromaticAberrationVar?: VariableData;
   splayVar?: VariableData;
   refractionIntensityVar?: VariableData;
+  customEffectId?: CodeComponentId;
+  componentPropAssignments?: ComponentPropAssignment[];
+  startRadiusVar?: VariableData;
+  startOffsetXVar?: VariableData;
+  startOffsetYVar?: VariableData;
+  endOffsetXVar?: VariableData;
+  endOffsetYVar?: VariableData;
+  noiseSizeXVar?: VariableData;
+  noiseSizeYVar?: VariableData;
+  densityVar?: VariableData;
+  effectOpacityVar?: VariableData;
+  secondaryColorVar?: VariableData;
+  id?: GUID;
 }
 
 export type TransformModifierType =
@@ -1406,6 +1530,88 @@ export interface TransformModifier {
   order?: RepeatOrder;
   skewX?: number;
   skewY?: number;
+}
+
+export type TransformSchemaType =
+  | "NONE"
+  | "FIXED_ORDER"
+  | "FREEFORM";
+
+export interface Matrix4f {
+  m00: number;
+  m01: number;
+  m02: number;
+  m03: number;
+  m10: number;
+  m11: number;
+  m12: number;
+  m13: number;
+  m20: number;
+  m21: number;
+  m22: number;
+  m23: number;
+  m30: number;
+  m31: number;
+  m32: number;
+  m33: number;
+}
+
+export interface FixedOrderTransform3d {
+  perspective?: number;
+  translateZ?: number;
+  rotateX?: number;
+  rotateY?: number;
+  rotateZ?: number;
+}
+
+export type TransformFnType =
+  | "NONE"
+  | "MATRIX_3D"
+  | "PERSPECTIVE"
+  | "TRANSLATE_Z"
+  | "ROTATE_X"
+  | "ROTATE_Y"
+  | "ROTATE_Z";
+
+export interface TransformFnValue {
+  matrix3d?: Matrix4f;
+  perspective?: number;
+  rotateAngle?: number;
+  translateValue?: number;
+}
+
+export interface TransformFn {
+  type?: TransformFnType;
+  value?: TransformFnValue;
+}
+
+export interface TransformSchemaValue {
+  fixedOrderTransform3d?: FixedOrderTransform3d;
+  transformFunctions?: TransformFn[];
+}
+
+export interface Transform3d {
+  type?: TransformSchemaType;
+  value?: TransformSchemaValue;
+  backfaceHidden?: boolean;
+  visible?: boolean;
+}
+
+export interface NumberVector2D {
+  x: Number;
+  y: Number;
+}
+
+export interface Scene3d {
+  perspective?: number;
+  perspectiveOrigin?: NumberVector2D;
+  preserve3d?: boolean;
+  visible?: boolean;
+}
+
+export interface TransformOrigin {
+  x?: Number;
+  y?: Number;
 }
 
 export interface TransitionInfo {
@@ -1466,6 +1672,11 @@ export type ExportColorProfile =
   | "DISPLAY_P3_V4"
   | "CMYK";
 
+export type ExportBackgroundType =
+  | "SOLID"
+  | "TRANSPARENT"
+  | "GRID";
+
 export interface ExportSettings {
   suffix?: string;
   imageType?: ImageType;
@@ -1479,6 +1690,11 @@ export interface ExportSettings {
   colorProfile?: ExportColorProfile;
   quality?: number;
   useBicubicSampler?: boolean;
+  frameRate?: number;
+  loopCount?: number;
+  backgroundType?: ExportBackgroundType;
+  duration?: number;
+  svgAnimated?: boolean;
 }
 
 export type ExportSVGIDMode =
@@ -1520,7 +1736,8 @@ export type StyleType =
   | "TEXT"
   | "EFFECT"
   | "EXPORT"
-  | "GRID";
+  | "GRID"
+  | "ANIMATION";
 
 export type BrushOrientation =
   | "FORWARD"
@@ -1546,6 +1763,28 @@ export interface ScatterStrokeSettings {
 
 export interface StretchStrokeSettings {
   orientation?: BrushOrientation;
+}
+
+export interface StrokeData {
+  strokes?: Stroke[];
+  version?: number;
+}
+
+export interface Stroke {
+  strokeId?: number;
+  strokeWeight?: number;
+  strokeWeightVar?: VariableData;
+  strokePaint?: Paint[];
+  styleIdForStrokeFill?: StyleId;
+  strokeAlign?: StrokeAlign;
+  strokeCap?: StrokeCap;
+  strokeCapSize?: Number;
+  strokeJoin?: StrokeJoin;
+  miterLimit?: number;
+  dashPattern?: number[];
+  pathTrim?: OptionalVector;
+  strokeOffset?: number;
+  isDeleted?: boolean;
 }
 
 export interface VariableWidthPoint {
@@ -1594,6 +1833,7 @@ export interface PluginRelaunchData {
   message?: string;
   command?: string;
   isDeleted?: boolean;
+  customToolId?: CodeComponentId;
 }
 
 export interface MultiplayerFieldVersion {
@@ -1784,7 +2024,8 @@ export type EditorType =
   | "SITES"
   | "COOPER"
   | "ILLUSTRATION"
-  | "FIGMAKE";
+  | "FIGMAKE"
+  | "FIGSPEC";
 
 export type MaskType =
   | "ALPHA"
@@ -1843,6 +2084,10 @@ export interface CodeEmbedInfo {
   isPublishedSite?: boolean;
 }
 
+export type VariableTimingDisplayUnit =
+  | "MILLISECONDS"
+  | "SECONDS";
+
 export interface NodeChange {
   guid?: GUID;
   guidTag?: number;
@@ -1888,10 +2133,12 @@ export interface NodeChange {
   styleIdForText?: StyleId;
   styleIdForEffect?: StyleId;
   styleIdForGrid?: StyleId;
+  styleAnimations?: StyleAnimation[];
   backgroundPaints?: Paint[];
   inheritFillStyleIDForBackground?: GUID;
   isStateGroup?: boolean;
   stateGroupPropertyValueOrders?: StateGroupPropertyValueOrder[];
+  partialPasteAnnotation?: PartialPasteAnnotation;
   sharedSymbolReference?: SharedSymbolReference;
   isSymbolPublishable?: boolean;
   sharedSymbolMappings?: GUIDPathMapping[];
@@ -1976,6 +2223,7 @@ export interface NodeChange {
   fontVariations?: FontVariation[];
   textBidiVersion?: number;
   textTruncation?: TextTruncation;
+  textWrapStyle?: TextWrapStyle;
   hasHadRTLText?: boolean;
   emojiImageSet?: EmojiImageSet;
   slideThumbnailHash?: string;
@@ -2019,18 +2267,25 @@ export interface NodeChange {
   strokePaintsTag?: number;
   effects?: Effect[];
   effectsTag?: number;
+  audioFills?: AudioFill[];
+  audioTracks?: AudioTrack[];
   backgroundColor?: Color;
   backgroundColorTag?: number;
   fillGeometry?: Path[];
   fillGeometryTag?: number;
   strokeGeometry?: Path[];
   strokeGeometryTag?: number;
+  offsetFillMaskGeometry?: Path[];
   textDecorationFillPaints?: Paint[];
   textDecorationSkipInk?: boolean;
   textUnderlineOffset?: Number;
   textDecorationThickness?: Number;
   textDecorationStyle?: TextDecorationStyle;
   transformModifiers?: TransformModifier[];
+  transform3d?: Transform3d;
+  strokeData?: StrokeData;
+  scene3d?: Scene3d;
+  transformOrigin?: TransformOrigin;
   rectangleTopLeftCornerRadius?: number;
   rectangleTopRightCornerRadius?: number;
   rectangleBottomLeftCornerRadius?: number;
@@ -2080,6 +2335,7 @@ export interface NodeChange {
   maxSize?: OptionalVector;
   stackCounterAlignContent?: StackCounterAlignContent;
   sortedMovingChildIndices?: number[];
+  stackLayoutVersion?: number;
   gridRows?: GUIDPositionMap;
   gridColumns?: GUIDPositionMap;
   gridRowGap?: number;
@@ -2173,6 +2429,7 @@ export interface NodeChange {
   isEmbeddedPrototype?: boolean;
   slideSpeakerNotes?: string;
   isSkippedSlide?: boolean;
+  presentationOutlines?: MultiplayerMap;
   themeID?: ThemeID;
   slideThemeData?: SlideThemeData;
   slideThemeMap?: SlideThemeMap;
@@ -2268,6 +2525,7 @@ export interface NodeChange {
   variableResolvedType?: VariableResolvedDataType;
   variableDataValues?: VariableDataValues;
   variableTokenName?: string;
+  timingDisplayUnit?: VariableTimingDisplayUnit;
   variableScopes?: VariableScope[];
   parameterConsumptionMap?: VariableDataMap;
   codeSyntax?: CodeSyntaxMap;
@@ -2344,6 +2602,7 @@ export interface NodeChange {
   aiChatThread?: AIChatThread;
   codeChatMessagesKey?: string;
   codeSnapshot?: CodeSnapshot;
+  codeSnapshotLayers?: CodeSnapshotLayers;
   codeSnapshotInvalidatedAt?: number;
   isCodeBehavior?: boolean;
   autoForkCode?: boolean;
@@ -2358,6 +2617,7 @@ export interface NodeChange {
   isCodePreviewPlayingOnCanvas?: boolean;
   codeEmbedInfo?: CodeEmbedInfo;
   isEmbedCodeLayer?: boolean;
+  codeSourceInfo?: CodeSourceInfo;
   mimeType?: string;
   blobRef?: Uint8Array;
   cmsSelector?: CMSSelector;
@@ -2382,34 +2642,105 @@ export interface NodeChange {
   backingNodeId?: CanvasNodeId;
   pageStatus?: string;
   motionTransform?: TRSSTransform2D;
+  linkMotionScaleAspectRatio?: boolean;
   timelinePosition?: bigint;
   keyframeValue?: KeyframeValueData;
+  keyframeValueRef?: VariableData;
   interpolationType?: InterpolationType;
   bezierHandles?: BezierHandles;
   easingData?: EasingData;
+  motionPathBezierHandles?: BezierHandles;
+  interpolationColorSpace?: InterpolationColorSpace;
+  interpolationHueMethod?: InterpolationHueMethod;
   keyframeOperation?: KeyframeOperation;
   timelinePositionType?: TimelinePositionType;
+  trackLoopMode?: TrackLoopMode;
   isClip?: boolean;
   clipId?: GUID;
   timelineDuration?: bigint;
+  timelineKeyframeSnappingFps?: FrameRate;
+  quantizeTimelinePlayback?: boolean;
   timelineOffset?: bigint;
   timelineDisabled?: boolean;
   playbackStyle?: PlaybackStyle;
   timelineDefinitions?: TimelineDefinitionsMap;
   timelineAssignments?: TimelineAssignmentsMap;
   animationPresets?: AnimationPresets;
+  styleIdsForAnimation?: StyleIdForAnimation[];
+  backingAnimationPresetId?: AnimationPresetId;
+  tools?: Tools;
+  customEffects?: CustomEffects;
   transitionOverrides?: TransitionOverrideData;
   useLegacySmartAnimate?: boolean;
+  sourceControlConfig?: SourceControlConfig;
+  makeContentState?: MakeContentState;
+  specBlockType?: SpecBlockType;
+  specBlockContent?: CollaborativePlainText;
+  specCodeBlockLanguage?: string;
+  specBlockTableAlignment?: string;
+  specBlockIndentLevel?: number;
+  specImageHash?: string;
+  specWidth?: number;
+  specHeight?: number;
+  specBlockTableRowHeights?: TableRowColumnSizeMap;
+  specBlockTableColumnWidths?: TableRowColumnSizeMap;
+  specEmbedUrl?: string;
+  specCanvasScrollEnabled?: boolean;
+  placeholder?: boolean;
+  placeholderClientLifecycleId?: string;
+  placeholderInvalidateAt?: number;
+  disableJitDst?: boolean;
+  customToolArtifactRef?: CustomToolArtifactRef;
+  weaveConnection?: WeaveConnection;
+  weaveLayerConnections?: WeaveLayerConnection[];
+  weaveLayerId?: string;
 }
+
+export type GitRepoRefProvider =
+  | "UGIT"
+  | "GITHUB"
+  | "OTHER";
+
+export interface GitRepoRef {
+  provider?: GitRepoRefProvider;
+  gitRepo?: string;
+  gitRef?: string;
+  gitBaseRef?: string;
+}
+
+export interface SourceControlConfig {
+  origin?: GitRepoRef;
+  upstream?: GitRepoRef;
+}
+
+export type MakeContentState =
+  | "UNKNOWN"
+  | "EMPTY"
+  | "POPULATED"
+  | "SEEDED";
 
 export interface CodeSnapshot {
   state?: CodeSnapshotState;
   invalidatedAt?: number;
+  cachedPreviewStatus?: CachedPreviewStatus;
+  commitSha?: string;
   paints?: Paint[];
   offset?: Vector;
   layoutSize?: Vector;
   canvasSize?: Vector;
   devicePixelRatio?: number;
+}
+
+export interface CodeOutputLayer {
+  node?: NodeChange;
+  sourceNodeId?: GUID;
+}
+
+export interface CodeSnapshotLayers {
+  state?: CodeSnapshotState;
+  invalidatedAt?: number;
+  cachedPreviewStatus?: CachedPreviewStatus;
+  layers?: CodeOutputLayer[];
 }
 
 export interface CodeBehaviorData {
@@ -2686,6 +3017,7 @@ export interface VideoPlayback {
   showControls?: boolean;
   startTimeMs?: number;
   endTimeMs?: number;
+  playbackRate?: number;
 }
 
 export type MediaAction =
@@ -2794,7 +3126,26 @@ export type VariableField =
   | "SCROLL_OFFSET_Y"
   | "PATH_TRIM_START"
   | "PATH_TRIM_END"
-  | "DISSOLVE_PROGRESS";
+  | "DISSOLVE_PROGRESS"
+  | "EASING_DATA"
+  | "MEDIA_CURRENT_TIME"
+  | "TRANSFORM_3D_PERSPECTIVE"
+  | "TRANSFORM_3D_TRANSLATION_Z"
+  | "TRANSFORM_3D_ROTATION_X"
+  | "TRANSFORM_3D_ROTATION_Y"
+  | "TRANSFORM_3D_ROTATION_Z"
+  | "POLYGON_COUNT"
+  | "ARC_DATA_STARTING_ANGLE"
+  | "ARC_DATA_ENDING_ANGLE"
+  | "ARC_DATA_INNER_RADIUS"
+  | "KEYFRAME_VALUE"
+  | "MOTION_TRANSLATION_XY"
+  | "MOTION_SCALE_XY"
+  | "SCENE_3D_PERSPECTIVE"
+  | "STAR_INNER_SCALE"
+  | "MOTION_TRANSFORM_ORIGIN_XY"
+  | "MOTION_TRANSFORM_ORIGIN_X"
+  | "MOTION_TRANSFORM_ORIGIN_Y";
 
 export interface VariableModeBySetMap {
   entries?: VariableModeBySetMapEntry[];
@@ -2977,6 +3328,9 @@ export interface ComponentPropDef {
   varValue?: VariableData;
   parameterConfig?: ParameterConfig;
   description?: string;
+  slotPropConfig?: SlotPropConfig;
+  colorArrayConfig?: ColorArrayConfig;
+  visibleWhen?: ComponentPropVisibilityClause[];
 }
 
 export interface ComponentPropValue {
@@ -2985,12 +3339,25 @@ export interface ComponentPropValue {
   guidValue?: GUID;
   floatValue?: number;
   easingData?: EasingData;
+  vectorValue?: Vector;
+  lineValue?: Line;
+  circleValue?: Circle;
+  rotation3DValue?: Rotation3D;
+  circlePointValue?: CirclePoint;
+  gradientValue?: Gradient;
+  colorPointValue?: ColorPoint;
+  colorArrayValue?: ColorArray;
+  paintValue?: Paint;
 }
 
 export interface TimelineData {
   durationUs?: bigint;
   defaultTimeline?: boolean;
   parentTimelineDefId?: GUID;
+  playbackStyle?: PlaybackStyle;
+  autoplay?: boolean;
+  keyframeSnappingFps?: FrameRate;
+  quantizePlayback?: boolean;
 }
 
 export interface TimelineDefinitionsMap {
@@ -3010,6 +3377,7 @@ export interface TimelineAssignmentKey {
 export interface TimelineBindingData {
   offsetUs?: bigint;
   disabled?: boolean;
+  autoplay?: boolean;
 }
 
 export interface TimelineAssignmentsMap {
@@ -3030,11 +3398,35 @@ export type ComponentPropType =
   | "NUMBER"
   | "IMAGE"
   | "SLOT"
-  | "EASING";
+  | "EASING"
+  | "COLOR_ARRAY"
+  | "VECTOR"
+  | "LINE"
+  | "CIRCLE"
+  | "ROTATION_3D"
+  | "CIRCLE_POINT"
+  | "GRADIENT"
+  | "COLOR_POINT"
+  | "PAINT";
 
 export interface ComponentPropPreferredValues {
   stringValues?: string[];
   instanceSwapValues?: InstanceSwapPreferredValue[];
+}
+
+export interface ComponentPropVisibilityClause {
+  siblingPropDefMatches?: ComponentPropSiblingMatch[];
+}
+
+export interface ComponentPropSiblingMatch {
+  propName?: string;
+  anyOf?: ComponentPropVisibilityValue[];
+}
+
+export interface ComponentPropVisibilityValue {
+  stringValue?: string;
+  floatValue?: number;
+  boolValue?: boolean;
 }
 
 export interface ParameterConfig {
@@ -3044,6 +3436,13 @@ export interface ParameterConfig {
   label?: VariableData;
   inputConfig?: InputConfig;
   selectConfig?: SelectConfig;
+  pointConfig?: PointConfig;
+  lineConfig?: LineConfig;
+  pointRadiusConfig?: PointRadiusConfig;
+  rotation3DConfig?: Rotation3DConfig;
+  circlePointConfig?: CirclePointConfig;
+  colorPointConfig?: ColorPointConfig;
+  showDividerAbove?: boolean;
 }
 
 export type ParameterConfigControl =
@@ -3056,21 +3455,120 @@ export interface InputConfig {
   unit?: VariableData;
   min?: VariableData;
   max?: VariableData;
+  icon?: string;
 }
 
 export interface SliderConfig {
   min?: VariableData;
   max?: VariableData;
   step?: VariableData;
+  unit?: VariableData;
+}
+
+export type PointMode =
+  | "CANVAS_AND_UI"
+  | "CANVAS"
+  | "UI";
+
+export interface PointConfig {
+  mode?: PointMode;
+  unit?: NumberUnits;
+}
+
+export interface Line {
+  a?: Vector;
+  b?: Vector;
+}
+
+export interface LineConfig {
+  mode?: PointMode;
+  unit?: NumberUnits;
+}
+
+export interface Circle {
+  center?: Vector;
+  radius?: number;
+}
+
+export interface PointRadiusConfig {
+  mode?: PointMode;
+  positionUnit?: NumberUnits;
+  radiusUnit?: NumberUnits;
+  minRadius?: number;
+  maxRadius?: number;
+}
+
+export interface Rotation3D {
+  x?: number;
+  y?: number;
+  z?: number;
+  translateZ?: number;
+}
+
+export interface Rotation3DConfig {
+  mode?: PointMode;
+}
+
+export interface CirclePoint {
+  center?: Vector;
+  radius?: number;
+  angle?: number;
+}
+
+export interface CirclePointConfig {
+  mode?: PointMode;
+  positionUnit?: NumberUnits;
+  radiusUnit?: NumberUnits;
+  minRadius?: number;
+  maxRadius?: number;
+}
+
+export interface ColorPoint {
+  point?: Vector;
+  color?: VariableData;
+}
+
+export interface ColorPointConfig {
+  mode?: PointMode;
+  unit?: NumberUnits;
+}
+
+export interface Gradient {
+  stops?: GradientStop[];
+}
+
+export interface GradientStop {
+  position?: number;
+  color?: VariableData;
+}
+
+export interface GradientParameterValue {
+  stops?: ColorStop[];
+  transform?: Matrix;
+  opacity?: number;
 }
 
 export interface SelectOption {
   value?: VariableData;
   label?: string;
+  icon?: string;
 }
 
 export interface SelectConfig {
   options?: SelectOption[];
+}
+
+export interface ColorArrayConfig {
+  minLength?: number;
+  maxLength?: number;
+}
+
+export interface SlotPropConfig {
+  stretchChildOnInsert?: boolean;
+  displayByDefault?: boolean;
+  minChildren?: number;
+  maxChildren?: number;
+  allowPreferredValuesOnly?: boolean;
 }
 
 export interface NumberPropConfig {
@@ -3167,6 +3665,30 @@ export type CodeBlockTheme =
   | "DUOTONE_FOREST"
   | "DUOTONE_LIGHT";
 
+export type SpecBlockType =
+  | "DEFAULT"
+  | "PARAGRAPH"
+  | "HEADING_1"
+  | "HEADING_2"
+  | "HEADING_3"
+  | "HEADING_4"
+  | "HEADING_5"
+  | "HEADING_6"
+  | "CODE_BLOCK"
+  | "BLOCK_QUOTE"
+  | "HORIZONTAL_RULE"
+  | "ORDERED_LIST_ITEM"
+  | "UNORDERED_LIST_ITEM"
+  | "DOCUMENT"
+  | "TABLE"
+  | "TABLE_ROW"
+  | "TABLE_CELL"
+  | "TODO_LIST_ITEM_UNCHECKED"
+  | "TODO_LIST_ITEM_CHECKED"
+  | "IMAGE"
+  | "EMBED"
+  | "EMBEDDED_CANVAS";
+
 export type InternalEnumForTest =
   | "OLD";
 
@@ -3177,6 +3699,19 @@ export interface InternalDataForTest {
 export interface StateGroupPropertyValueOrder {
   property?: string;
   values?: string[];
+}
+
+export type BackfillError =
+  | "NONE"
+  | "TRANSIENT_RETRYING"
+  | "PERMANENTLY_FAILED"
+  | "PASTE_FAILED";
+
+export interface PartialPasteAnnotation {
+  isPartial?: boolean;
+  annotatedAt?: bigint;
+  errorState?: BackfillError;
+  upserted?: boolean;
 }
 
 export interface VariantPropSpec {
@@ -3250,6 +3785,7 @@ export interface PrototypeEvent {
   voiceEventPhrase?: string;
   transitionTimeout?: number;
   mediaHitTime?: number;
+  transitionTimeoutVar?: VariableData;
 }
 
 export interface PrototypeVariableTarget {
@@ -3267,8 +3803,13 @@ export interface PrototypeAction {
   transitionType?: TransitionType;
   transitionDuration?: number;
   easingType?: EasingType;
+  transitionDurationVar?: VariableData;
+  easingVar?: VariableData;
   transitionTimeout?: number;
   transitionShouldSmartAnimate?: boolean;
+  enableJitSmartAnimate?: boolean;
+  interpolationColorSpace?: InterpolationColorSpace;
+  interpolationHueMethod?: InterpolationHueMethod;
   connectionType?: ConnectionType;
   overlayRelativePosition?: Vector;
   navigationType?: NavigationType;
@@ -3277,6 +3818,7 @@ export interface PrototypeAction {
   extraScrollOffset?: Vector;
   transitionResetScrollPosition?: boolean;
   transitionResetInteractiveComponents?: boolean;
+  transitionOverridesEnabled?: boolean;
   connectionURL?: string;
   openUrlInNewTab?: boolean;
   linkParam?: VariableData;
@@ -3356,7 +3898,8 @@ export interface CMSItemPageTarget {
 
 export type MentionSource =
   | "DEFAULT"
-  | "COPY_DUPLICATE";
+  | "COPY_DUPLICATE"
+  | "SILENT_INSERT";
 
 export interface Mention {
   id?: GUID;
@@ -3462,6 +4005,15 @@ export interface VideoStateChangeData {
   isPlayingSound?: boolean;
   currentTimes?: number[];
   actionTakenTimestamp?: number;
+  playbackRate?: number;
+}
+
+export interface TimelinePlaybackStateData {
+  status?: number;
+  playbackTimeUs?: bigint;
+  timelineRootId?: GUID;
+  timelineDefId?: GUID;
+  focusedSubtimelineRootId?: GUID;
 }
 
 export interface EmbeddedPrototypeData {
@@ -3565,6 +4117,10 @@ export interface AprilFunFigPal {
   name?: string;
 }
 
+export interface SanrioCharacter {
+  character?: string;
+}
+
 export type Heartbeat =
   | "FOREGROUND"
   | "BACKGROUND";
@@ -3581,6 +4137,21 @@ export type DesignFullPageViewState =
   | "NONE"
   | "DESIGN_SYSTEM"
   | "VARIABLES";
+
+export interface AgentInfo {
+  name?: string;
+  logo?: string;
+  oauthClientId?: string;
+}
+
+export type AgentActivityStatus =
+  | "RUNNING";
+
+export interface AgentCanvasActivity {
+  nodeIds?: GUID[];
+  status?: AgentActivityStatus;
+  triggeringUserId?: string;
+}
 
 export interface UserChange {
   sessionID?: number;
@@ -3628,6 +4199,11 @@ export interface UserChange {
   sitesViewState?: SitesViewState;
   nodeChatExchanges?: NodeChatExchange[];
   designFullPageViewState?: DesignFullPageViewState;
+  agentInfo?: AgentInfo;
+  timelinePlaybackState?: TimelinePlaybackStateData[];
+  agentCanvasActivity?: AgentCanvasActivity;
+  assistantThreadId?: string;
+  sanrioCharacter?: SanrioCharacter;
 }
 
 export interface InteractiveSlideElementChange {
@@ -3657,6 +4233,10 @@ export type SceneGraphQueryBehavior =
   | "DEFAULT"
   | "CONTAINING_PAGE"
   | "PLUGIN";
+
+export type SceneGraphQueryMode =
+  | "ADD"
+  | "SET";
 
 export interface SceneGraphQuery {
   startingNode?: GUID;
@@ -3713,7 +4293,16 @@ export interface ClientBroadcast {
 
 export type PasteAssetType =
   | "UNKNOWN"
-  | "VARIABLE";
+  | "VARIABLE"
+  | "STYLE_PROPERTIES"
+  | "STYLE_PROPERTIES_FILL"
+  | "STYLE_PROPERTIES_STROKE"
+  | "STYLE_PROPERTIES_EFFECT";
+
+export type NodeChangeOrder =
+  | "GUID"
+  | "PREORDER"
+  | "TOPOLOGICAL";
 
 export interface Message {
   type?: MessageType;
@@ -3760,6 +4349,10 @@ export interface Message {
   clientRenderedMetadata?: ClientRenderedMetadata;
   pasteAssetType?: PasteAssetType;
   objectAnimations?: ObjectAnimationList;
+  sceneGraphQueryMode?: SceneGraphQueryMode;
+  undoBatchPageIds?: GUID[];
+  originFileKey?: string;
+  nodeChangeOrder?: NodeChangeOrder;
 }
 
 export interface EncodedOffsetsIndex {
@@ -3834,7 +4427,18 @@ export type VariableDataType =
   | "DATE"
   | "KEYFRAME_TRACK_ID"
   | "KEYFRAME_TRACK_PARAMETER_DATA"
-  | "EASING";
+  | "EASING"
+  | "TIMING"
+  | "VECTOR"
+  | "COLOR_ARRAY"
+  | "LINE"
+  | "CIRCLE"
+  | "ROTATION_3D"
+  | "CIRCLE_POINT"
+  | "GRADIENT"
+  | "COLOR_POINT"
+  | "GRADIENT_PAINT"
+  | "PAINT";
 
 export type VariableResolvedDataType =
   | "BOOLEAN"
@@ -3851,7 +4455,18 @@ export type VariableResolvedDataType =
   | "SLOT_CONTENT_ID"
   | "KEYFRAME_TRACK_ID"
   | "KEYFRAME_TRACK_PARAMETER_DATA"
-  | "EASING";
+  | "EASING"
+  | "TIMING"
+  | "VECTOR"
+  | "COLOR_ARRAY"
+  | "LINE"
+  | "CIRCLE"
+  | "ROTATION_3D"
+  | "CIRCLE_POINT"
+  | "GRADIENT"
+  | "COLOR_POINT"
+  | "GRADIENT_PAINT"
+  | "PAINT";
 
 export interface VariableAnyValue {
   boolValue?: boolean;
@@ -3875,6 +4490,16 @@ export interface VariableAnyValue {
   keyframeTrackIdValue?: KeyframeTrackId;
   keyframeTrackParameterValue?: KeyframeTrackParameterValue;
   easingValue?: EasingData;
+  vectorValue?: Vector;
+  colorArrayValue?: ColorArray;
+  lineValue?: Line;
+  circleValue?: Circle;
+  rotation3DValue?: Rotation3D;
+  circlePointValue?: CirclePoint;
+  gradientValue?: Gradient;
+  colorPointValue?: ColorPoint;
+  gradientParameterValue?: GradientParameterValue;
+  paintValue?: Paint;
 }
 
 export type ExpressionFunction =
@@ -3897,7 +4522,9 @@ export type ExpressionFunction =
   | "VAR_MODE_LOOKUP"
   | "NEGATE"
   | "IS_TRUTHY"
-  | "KEYFRAME";
+  | "KEYFRAME"
+  | "COMPOSE_COLOR"
+  | "PAINT_TO_COLOR";
 
 export interface Expression {
   expressionFunction?: ExpressionFunction;
@@ -3912,6 +4539,10 @@ export interface VariableMapValue {
 
 export interface VariableMap {
   values?: VariableMapValue[];
+}
+
+export interface ColorArray {
+  colors?: VariableData[];
 }
 
 export interface VariableFontStyle {
@@ -3995,6 +4626,16 @@ export interface AnimationPresetId {
   assetRef?: AssetRef;
 }
 
+export interface ToolId {
+  guid?: GUID;
+  assetRef?: AssetRef;
+}
+
+export interface CustomEffectId {
+  guid?: GUID;
+  assetRef?: AssetRef;
+}
+
 export interface TRSSTransform2D {
   translation?: Vector;
   rotation?: number;
@@ -4048,19 +4689,36 @@ export type VariableScope =
   | "PARAGRAPH_SPACING"
   | "PARAGRAPH_INDENT"
   | "FONT_VARIATIONS"
-  | "TRANSFORM";
+  | "TRANSFORM"
+  | "COLOR_OPACITY";
 
 export interface KeyframeAnyValue {
   floatValue?: number;
   colorValue?: Color;
   textDataValue?: TextData;
+  vectorValue?: Vector;
+  boolValue?: boolean;
+  circleValue?: Circle;
+  lineValue?: Line;
+  circlePointValue?: CirclePoint;
+  colorPointValue?: ColorPoint;
+  gradientParameterValue?: GradientParameterValue;
+  paintValue?: Paint;
 }
 
 export type KeyframeValueType =
   | "FLOAT"
   | "INVALID"
   | "COLOR"
-  | "TEXT_DATA";
+  | "TEXT_DATA"
+  | "VECTOR"
+  | "BOOL"
+  | "CIRCLE"
+  | "LINE"
+  | "CIRCLE_POINT"
+  | "COLOR_POINT"
+  | "GRADIENT_PAINT"
+  | "PAINT";
 
 export interface KeyframeValueData {
   value?: KeyframeAnyValue;
@@ -4086,6 +4744,7 @@ export interface AnimationPresetKeyframeTrackParameter {
 export interface KeyframeTrackAnyParameter {
   manual?: ManualKeyframeTrackParameter;
   animationPreset?: AnimationPresetKeyframeTrackParameter;
+  animationStyleBindingId?: GUID;
 }
 
 export interface KeyframeTrackParameter {
@@ -4103,12 +4762,46 @@ export interface AnimationPresets {
 
 export interface AnimationPresetData {
   animationPresetId?: AnimationPresetId;
+  timelineDefId?: GUID;
+  sortPosition?: string;
 }
+
+export interface StyleAnimation {
+  animationPresetId?: AnimationPresetId;
+}
+
+export interface StyleIdForAnimation {
+  id?: GUID;
+  timelineDefId?: GUID;
+  animationStyleId?: StyleId;
+  timelineOffset?: bigint;
+  generatedAnimationPresets?: GeneratedAnimationPreset[];
+  sortPosition?: string;
+}
+
+export interface GeneratedAnimationPreset {
+  animationPresetId?: AnimationPresetId;
+}
+
+export interface Tools {
+  tools?: ToolData[];
+}
+
+export interface ToolData {
+  toolId?: ToolId;
+  backingCodeComponentId?: CodeComponentId;
+  componentPropAssignments?: ComponentPropAssignment[];
+}
+
+export type SpringType =
+  | "NORMALIZED"
+  | "PHYSICAL";
 
 export interface SpringParams {
   stiffness?: number;
   damping?: number;
   mass?: number;
+  springType?: SpringType;
 }
 
 export interface TransitionEasingAnyValue {
@@ -4130,6 +4823,8 @@ export interface TransitionOverride {
   easing?: EasingData;
   easingVar?: VariableData;
   createdAtMs?: bigint;
+  interactionIDs?: GUID[];
+  disabled?: boolean;
 }
 
 export interface TransitionOverrideData {
@@ -4158,6 +4853,37 @@ export interface TransitionOverrideBindingLocation {
   effectParametrizedFieldValue?: number;
 }
 
+export type KeyframeBindingEffectParametrizedField =
+  | "MISSING"
+  | "OFFSET_X"
+  | "OFFSET_Y"
+  | "RADIUS"
+  | "SPREAD"
+  | "COLOR"
+  | "REFRACTION_RADIUS"
+  | "SPECULAR_ANGLE"
+  | "SPECULAR_INTENSITY"
+  | "CHROMATIC_ABERRATION"
+  | "SPLAY"
+  | "REFRACTION_INTENSITY"
+  | "START_RADIUS"
+  | "START_OFFSET_X"
+  | "START_OFFSET_Y"
+  | "END_OFFSET_X"
+  | "END_OFFSET_Y"
+  | "NOISE_SIZE_X"
+  | "NOISE_SIZE_Y"
+  | "DENSITY"
+  | "EFFECT_OPACITY"
+  | "SECONDARY_COLOR";
+
+export interface NodeContentsKeyframeBindingLocation {
+  topLevelField?: TransitionOverrideBindingTopLevelField;
+  parameterFieldValue?: VariableField;
+  index?: number;
+  effectParametrizedFieldValue?: KeyframeBindingEffectParametrizedField;
+}
+
 export interface TransitionOverridePropMap {
   entries?: TransitionOverridePropMapEntry[];
 }
@@ -4166,6 +4892,7 @@ export interface TransitionOverridePropMapEntry {
   prop?: TransitionOverrideProp;
   overrides?: TransitionOverride[];
   bindingLocation?: TransitionOverrideBindingLocation;
+  nodeContentsBindingLocation?: NodeContentsKeyframeBindingLocation;
 }
 
 export type CodeSyntaxPlatform =
@@ -4471,12 +5198,18 @@ export interface SectionPresetInfo {
   state?: SectionPresetState;
 }
 
+export interface ClipboardTextRange {
+  start?: number;
+  end?: number;
+}
+
 export interface ClipboardSelectionRegion {
   parent?: GUID;
   nodes?: GUID[];
   enclosingFrameOffset?: Vector;
   pasteIsPartiallyOutsideEnclosingFrame?: boolean;
   focusType?: SelectionRegionFocusType;
+  textRange?: ClipboardTextRange;
 }
 
 export type FirstDraftKitType =
@@ -4643,6 +5376,14 @@ export interface ClientRenderedMetadata {
   trackingSessionId?: string;
   trackingSessionSequenceId?: number;
   reconnectID?: string;
+}
+
+export interface CustomEffects {
+  customEffects?: CustomEffectData[];
+}
+
+export interface CustomEffectData {
+  customEffectId?: CustomEffectId;
 }
 
 export type LinkBehaviorType =
@@ -4902,6 +5643,11 @@ export interface ImageImport {
   image?: Image;
 }
 
+export interface FrameRate {
+  numerator?: number;
+  denominator?: number;
+}
+
 export type InterpolationType =
   | "HOLD"
   | "BEZIER"
@@ -4927,3 +5673,29 @@ export type PlaybackStyle =
   | "ONCE"
   | "LOOP"
   | "BOOMERANG";
+
+export type TrackLoopMode =
+  | "NONE"
+  | "LOOP";
+
+export interface AudioFill {
+  id?: GUID;
+  mediaHash?: string;
+  timelineOffsetUs?: bigint;
+  startTimeUs?: bigint;
+  durationUs?: bigint;
+  volume?: number;
+  mute?: boolean;
+  displayName?: string;
+  loopEnabled?: boolean;
+  playbackDurationUs?: bigint;
+  trackId?: GUID;
+  loopPhaseOffsetUs?: bigint;
+}
+
+export interface AudioTrack {
+  id?: GUID;
+  name?: string;
+  gain?: number;
+  mute?: boolean;
+}

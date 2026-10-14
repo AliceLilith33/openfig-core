@@ -27,12 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The built-in schema (`figKiwiSchema.ts`) and `Kiwi` types are regenerated from a format-version-106 file: 631 definitions and 4,002 fields, up from 550 and 3,452. Its fields are a superset of the previous schema and of every schema in 181 public files, other than fields Figma has removed. Parsing never depended on it — files are decoded with their own embedded schema — but nodes from current files now type-check against `Kiwi`.
 - `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
 - `parseCommandsBlob(blob, { strict })` — decodes a geometry `commandsBlob` into `VectorPathCommand[]` with the stored float32 values.
 - `liveChildren(doc, id)` — a node's children in layer order, without `REMOVED` nodes.
 - `resolveInstance(doc, instance)` and `resolveTree(doc, node)` — what an instance displays: its symbol's content with overrides, `derivedSymbolData` and component property values applied, nested instances expanded and instance swaps followed. Every override and derived entry in the reference corpus (21,608 across 440 instances) lands on exactly one node, and every derived size and transform matches. With `walkResolved` and `overrideKeyOf`.
 - Variable resolution: `resolveVariable`, `resolveVariableData`, `resolvePaintColor` and `resolveBoundVariables`, with `findVariable`, `variableSetOf`, `variableModes` and `explicitModes`. Aliases are followed, library variables resolve by asset key, and modes come from `variableModeBySetMap`. All 107 variable-bound paints in the reference corpus resolve to the colour Figma cached on the paint.
-- `Kiwi` — TypeScript types for all 550 schema definitions (`Kiwi.NodeChange`, `Kiwi.Paint`, `Kiwi.NodeType`, ...), generated from `figKiwiSchema.ts` by `src/utilities/generateKiwiTypes.ts`. A test fails when they go stale, and every node decoded from the reference fixtures conforms to them.
+- `Kiwi` — TypeScript types for all 631 schema definitions (`Kiwi.NodeChange`, `Kiwi.Paint`, `Kiwi.NodeType`, ...), generated from `figKiwiSchema.ts` by `src/utilities/generateKiwiTypes.ts`. A test fails when they go stale, and every node decoded from the reference fixtures conforms to them.
 - Tree helpers: `walk`, `findAll`, `parentOf`, `ancestors`, `pageOf`. They tolerate dangling parents and parent cycles.
 - `getAbsoluteTransform` and `getAbsoluteBoundingBox` — page coordinates, composed up to the node's `CANVAS`; with `multiplyTransform`, `applyTransform` and `IDENTITY_TRANSFORM`.
 
