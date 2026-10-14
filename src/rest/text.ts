@@ -38,6 +38,10 @@ function withTextStyle(src: any, lookup: StyleLookup | undefined): any {
   if (!style) return src;
   const out = { ...src };
   for (const k of STYLE_FIELDS) if (style[k] !== undefined) out[k] = style[k];
+  // Kiwi leaves default values out: a style without a case or decoration sets
+  // the original case and none, whatever the node's cached copy says.
+  if (style.textCase === undefined) out.textCase = "ORIGINAL";
+  if (style.textDecoration === undefined) out.textDecoration = "NONE";
   // The style's own font metrics, for line heights relative to the font.
   out.styleFontMetaData = style.derivedTextData?.fontMetaData;
   return out;

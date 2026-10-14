@@ -236,6 +236,7 @@ function textStyle(s: any, full: boolean): Partial<IRTextStyle> {
   if (s.paragraphSpacing) out.paragraphSpacing = s.paragraphSpacing;
   if (s.paragraphIndent) out.paragraphIndent = s.paragraphIndent;
   if (s.listSpacing) out.listSpacing = s.listSpacing;
+  if (s.leadingTrim === "CAP_HEIGHT") out.leadingTrim = "cap";
   return out;
 }
 
@@ -771,15 +772,18 @@ function convert(ctx: Ctx, n: any, parent: Parent | undefined, page: string): IR
   return out;
 }
 
-function screens(ctx: Ctx, page: any, list: any[], section: string[], out: IRScreen[]): void {
+function screens(ctx: Ctx, page: any, list: any[], section: string[], out: IRScreen[], modes?: Record<string, string>): void {
   for (const c of list) {
     if (c.type === "SECTION") {
       if (c.visible === false && !ctx.options.keepHidden) continue;
-      screens(ctx, page, c.children ?? [], [...section, c.name], out);
+      const own = nodeModes(ctx, c);
+      screens(ctx, page, c.children ?? [], [...section, c.name], out, own ? { ...modes, ...own } : modes);
       continue;
     }
     const root = convert(ctx, c, { rest: page }, page.id);
     if (!root) continue;
+    // Modes set on the page or a section around the screen apply inside it.
+    if (modes) root.modes = { ...modes, ...root.modes };
     // Component definitions live in `components`, not among the screens.
     if (c.type === "COMPONENT" || c.type === "COMPONENT_SET") continue;
     const s: IRScreen = { id: c.id, name: c.name, root };
@@ -809,7 +813,7 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
   for (const page of (file.document as any).children ?? []) {
     if (page.type !== "CANVAS") continue;
     const list: IRScreen[] = [];
-    screens(ctx, page, page.children ?? [], [], list);
+    screens(ctx, page, page.children ?? [], [], list, nodeModes(ctx, page));
     pages.push({
       id: page.id,
       name: page.name,

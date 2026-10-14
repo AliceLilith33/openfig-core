@@ -194,7 +194,7 @@ const FRAME_LIKE = new Set(["FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INS
 const SECTION_FIELDS = new Set([
   "id", "name", "type", "visible", "locked", "scrollBehavior", "children", "fills", "fillGeometry",
   "strokes", "strokeWeight", "strokeAlign", "strokeGeometry", "absoluteBoundingBox", "absoluteRenderBounds",
-  "relativeTransform", "size", "sectionContentsHidden", "boundVariables",
+  "relativeTransform", "size", "sectionContentsHidden", "boundVariables", "explicitVariableModes",
 ]);
 
 /** Types REST never gives corner fields. */

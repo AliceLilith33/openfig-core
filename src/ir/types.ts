@@ -286,6 +286,8 @@ export interface IRTextStyle {
   paragraphSpacing?: number;
   paragraphIndent?: number;
   listSpacing?: number;
+  /** Figma's vertical trim: the box runs from the cap height to the baseline. */
+  leadingTrim?: "cap";
 }
 
 export interface IRTextRun {
