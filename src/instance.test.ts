@@ -108,6 +108,20 @@ describe("resolveInstance", () => {
     expect(label.node.textData?.characters).toBe("outer");
   });
 
+  it("drops the nested instance's own entries when an outer override swaps it, even to the same symbol", () => {
+    const doc = docOf([
+      ...base().map((n) => n.id === 12
+        ? { ...n, symbolData: { symbolID: G(20), symbolOverrides: [override([K(3)], { textData: { characters: "inner" } })] } }
+        : n),
+      { id: 1, type: "INSTANCE", symbolData: { symbolID: G(10), symbolOverrides: [override([K(2)], { overriddenSymbolID: G(20) })] } },
+      { id: 2, type: "INSTANCE", symbolData: { symbolID: G(10) } },
+    ]);
+    const label = (id: string) => resolveInstance(doc, doc.nodeMap.get(id)!).children[1].children[0].node;
+    expect(label("1:1").textData?.characters).toBe("New");
+    // Without the swap, the nested instance's own override still applies.
+    expect(label("1:2").textData?.characters).toBe("inner");
+  });
+
   it("applies derived data after overrides", () => {
     const doc = docOf([...base(), {
       id: 1, type: "INSTANCE", symbolData: { symbolID: G(10), symbolOverrides: [override([K(1)], { size: { x: 1, y: 1 } })] },

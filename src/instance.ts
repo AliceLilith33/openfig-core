@@ -195,9 +195,14 @@ export function resolveTree(doc: FigDocument, node: FigNode, options: ResolveOpt
 
     // The scope inside: the instance's own entries, then the outer ones
     // addressed through it. Later entries win, so outer beats inner.
+    // An outer swap discards the instance's own entries, even when it swaps to
+    // the same symbol: Figma's derived data for such instances never reflects
+    // them (58 derived entries across the public corpus match only this way).
+    const swappedByOuter = outerOverrides.some((o) => o.data.overriddenSymbolID);
+    const own = (entries: any[] | undefined) => (swappedByOuter ? [] : scoped(entries));
     const inner: Scope = {
-      overrides: [...scoped(source.symbolData?.symbolOverrides), ...through(scope.overrides, key)],
-      derived: applyDerived ? [...scoped(source.derivedSymbolData), ...through(scope.derived, key)] : [],
+      overrides: [...own(source.symbolData?.symbolOverrides), ...through(scope.overrides, key)],
+      derived: applyDerived ? [...own(source.derivedSymbolData), ...through(scope.derived, key)] : [],
       props: new Map(),
       prefix: path,
       stack: scope.stack,
