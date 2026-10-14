@@ -83,6 +83,26 @@ const VARIABLE_FIELDS: Record<string, string> = {
 };
 
 /**
+ * The REST field and alias of one `variableConsumptionMap` entry of text, if
+ * it binds one. A bound font style holds the weight variable (`asFloat`) or
+ * a style name variable (`asString`).
+ */
+export function textBinding(e: any): [string, Rest.VariableAlias] | undefined {
+  const field = VARIABLE_FIELDS[e?.variableField];
+  if (!field) return undefined;
+  const data = e.variableData;
+  if (data?.dataType === "FONT_STYLE") {
+    const v = data.value?.fontStyleValue;
+    const weight = variableAlias(v?.asFloat);
+    if (weight) return ["fontWeight", weight];
+    const style = variableAlias(v?.asString);
+    return style ? ["fontStyle", style] : undefined;
+  }
+  const alias = variableAlias(data);
+  return alias ? [field, alias] : undefined;
+}
+
+/**
  * The REST `TypeStyle` of `src` — a TEXT node, or one entry of its
  * `styleOverrideTable` when `base` is the node it overrides. An override only
  * lists the fields it sets, as REST does.
@@ -138,9 +158,8 @@ function typeStyle(rawSrc: any, base: any, lookup: StyleLookup | undefined, reso
 
   const bound: any = {};
   for (const e of src.variableConsumptionMap?.entries ?? []) {
-    const field = VARIABLE_FIELDS[e?.variableField];
-    const alias = field && variableAlias(e.variableData);
-    if (alias) bound[field] = alias;
+    const b = textBinding(e);
+    if (b) bound[b[0]] = b[1];
   }
   if (Object.keys(bound).length) out.boundVariables = bound;
   return out;

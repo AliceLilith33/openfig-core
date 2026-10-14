@@ -102,6 +102,15 @@ function through(list: Scoped[], key: FigGuid): Scoped[] {
     .map((o) => ({ path: o.path.slice(1), data: o.data }));
 }
 
+/** Lengths that scaling an instance changes on the instance itself. */
+const SCALED_FIELDS = new Set([
+  "strokeWeight", "borderTopWeight", "borderRightWeight", "borderBottomWeight", "borderLeftWeight",
+  "cornerRadius", "rectangleTopLeftCornerRadius", "rectangleTopRightCornerRadius",
+  "rectangleBottomLeftCornerRadius", "rectangleBottomRightCornerRadius",
+  "stackSpacing", "stackCounterSpacing", "stackHorizontalPadding", "stackVerticalPadding",
+  "stackPaddingRight", "stackPaddingBottom",
+]);
+
 /** Copy every node property an override or derived entry carries onto `node`. */
 export function applyNodeChange(node: FigNode, change: Record<string, any>): void {
   for (const [field, value] of Object.entries(change)) {
@@ -211,7 +220,14 @@ export function resolveTree(doc: FigDocument, node: FigNode, options: ResolveOpt
     // Entries addressing the symbol root apply to the instance itself, before
     // the outer scope's own entries for it.
     const selfKey = symbol ? overrideKeyOf(symbol) : undefined;
-    if (selfKey) for (const o of addressed(inner.overrides, selfKey)) applyNodeChange(node, o.data);
+    if (selfKey) {
+      for (const o of addressed(inner.overrides, selfKey)) {
+        // Scaling an instance scales the lengths it stores; an entry for the
+        // root may still hold them from before.
+        const fresh = Object.fromEntries(Object.entries(o.data).filter(([k]) => !(SCALED_FIELDS.has(k) && k in source)));
+        applyNodeChange(node, fresh);
+      }
+    }
     for (const o of outerOverrides) applyNodeChange(node, o.data);
     if (selfKey) for (const d of addressed(inner.derived, selfKey)) applyNodeChange(node, d.data);
     for (const d of outerDerived) applyNodeChange(node, d.data);

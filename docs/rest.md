@@ -25,6 +25,11 @@ field of every node:
 - 99.8% of `fillGeometry` and `strokeGeometry` lists are byte for byte the
   same (24,655 of 24,700).
 
+A third pair, 20 nodes of the Material 3 Design Kit (the `.fig` from
+open-pencil's test fixtures, the `/files/:key/nodes?geometry=paths` response
+from southleft/ds-contracts-poc, both MIT), matches on all 318 fields compared
+and on the render bounds of all 12 nodes that have them.
+
 `src/rest/rest.test.ts` repeats the comparison when `OPENFIG_REST_PAIRS` points
 at a folder holding `<name>.fig` next to `<name>/document.json`. It also runs
 without errors on 179 public files (815,280 REST nodes).
@@ -85,7 +90,22 @@ itself, by collection id (`VariableCollectionId:s:l`, or by key and version
 for a library collection) to mode id. In the variables response, a library
 variable's id is `VariableID:<key>/<version>`, as references to it are
 written; kiwi scopes `STROKE` are REST's `STROKE_COLOR`; `isSoftDeleted` is
-`deletedButReferenced`.
+`deletedButReferenced`. A deleted collection is left out, as REST does; its
+variables stay, marked `deletedButReferenced`, for the aliases that still
+name them.
+
+**Text styles' variables.** A text style binds its font size, family and
+weight on the style node; REST shows those bindings on each text that uses the
+style and binds nothing itself. A binding on the font style is the weight when
+its value is a number and the style name when it is a string.
+
+**Render bounds.** `absoluteRenderBounds` is the extent of what is drawn: the
+fill and stroke outlines of a shape (an inside stroke drawn only within the
+fill), the glyph outlines of text up to where it is truncated, with
+underlines, a frame's own box, drop shadows (offset, spread, radius) and layer
+blur (radius); children are added to their parent and cut by frames that clip
+and by masks. Masks and the operands of boolean operations report `null`; a
+group takes the layout box of the text in it.
 
 **Component properties.** Each variant of a set carries a stub for every
 property of the set, naming the set's definition by `parentPropDefId`; a
@@ -133,8 +153,9 @@ directional transitions are named by where they come from in kiwi
 
 ## Known differences
 
-- `absoluteRenderBounds` is the bounding box, or `null` for a hidden node or a
-  node under one. Figma's value includes strokes, effects and glyph outlines.
+- `absoluteRenderBounds` matches within 1px on 9,022 of 9,026 and 3,324 of
+  3,324 nodes; the four left are boolean operations. Background blur and inner
+  shadows are taken not to extend it.
 - `key` of local components, component sets and styles is empty: Figma assigns
   it on publishing and does not store it in the file (674 mismatches).
 - GROUP and VECTOR corner fields Figma derives from their children or vertices
@@ -142,9 +163,14 @@ directional transitions are named by where they come from in kiwi
 - `vectorNetwork`, an undocumented REST field, is not produced.
 - Eight text layers that kiwi marks as growing in both directions are FIXED in
   REST, for a reason not found in the file.
-- `toRestVariables` has not been compared with a REST response: the public
-  pairs include none.
+- `toRestVariables` has been compared only with Figma's Simple Design System
+  ([figma/sds](https://github.com/figma/sds), MIT), whose `tokens.json` its
+  script builds from the variables response (booleans dropped, names
+  lowercased): all 337 variable ids, the 6 collections and their modes match,
+  and 1,823 of 1,841 values; the other 18 differ between versions of the file.
+  No raw variables response with its `.fig` is public.
 - The track sizing format of grids is not documented by Figma and has not been
   checked against a REST response.
-- An instance scaled with K (`uniformScaleFactor`) shows its own stroke weight
-  unscaled in a few cases (11).
+- An instance scaled with K (`uniformScaleFactor`) stores its scaled lengths;
+  an override for its root may still hold them unscaled and is not applied to
+  them (stroke weights, corner radii, auto-layout gap and padding).

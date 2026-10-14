@@ -157,8 +157,10 @@ function buildTokens(meta: RestVariables["meta"] | undefined): { tokens: IRToken
 
   // Names are unique within a collection, not across them: a library's
   // collection copied into the file often shares a local one's name. Local
-  // variables get the plain name; others are qualified until unique.
-  const variables = Object.values(meta.variables).sort((a, b) => Number(a.remote) - Number(b.remote));
+  // variables get the plain name, then library ones, then deleted ones kept
+  // for their references; the rest are qualified until unique.
+  const rank = (v: Rest.LocalVariable) => (v.deletedButReferenced ? 2 : v.remote ? 1 : 0);
+  const variables = Object.values(meta.variables).sort((a, b) => rank(a) - rank(b));
   const names = new Map<string, string>();
   const taken = new Set<string>();
   for (const v of variables) {

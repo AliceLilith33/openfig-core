@@ -89,7 +89,11 @@ export function toRestVariables(doc: FigDocument): RestVariables {
   const live = (n: FigNode) => n.phase !== "REMOVED";
 
   const sets = doc.nodes.filter((n) => n.type === "VARIABLE_SET" && live(n));
+  // A deleted collection stays in the file while something refers to it; REST
+  // leaves it out, and its variables count as deleted.
+  const deletedSets = new Set(sets.filter((s) => (s as any).isSoftDeleted).map(restCollectionId));
   for (const set of sets) {
+    if (deletedSets.has(restCollectionId(set))) continue;
     const any = set as any;
     const modes = variableModes(set);
     const id = restCollectionId(set);
@@ -130,7 +134,7 @@ export function toRestVariables(doc: FigDocument): RestVariables {
       scopes: scopes(any.variableScopes),
       codeSyntax: codeSyntax(any.codeSyntax),
     };
-    if (any.isSoftDeleted) out.deletedButReferenced = true;
+    if (any.isSoftDeleted || deletedSets.has(collectionId)) out.deletedButReferenced = true;
     variables[id] = out;
     variableCollections[collectionId]?.variableIds.push(id);
   }

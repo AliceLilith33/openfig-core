@@ -8,6 +8,7 @@
  * cached layout (`derivedSymbolData`) where it has one.
  */
 import type * as Rest from "@figma/rest-api-spec";
+import { geometryBounds, glyphBounds, intersect, union, withEffects, type Rect } from "./bounds.js";
 import type { FigColor, FigDocument, FigGuid, FigNode, FigTransform } from "../types.js";
 import { resolveTree, type ResolvedNode } from "../instance.js";
 import { multiplyTransform, IDENTITY_TRANSFORM } from "../tree.js";
@@ -16,7 +17,7 @@ import { findVariableSet, resolveVariableData } from "../variables.js";
 import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
 import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
 import { interactions } from "./interactions.js";
-import { textFields } from "./text.js";
+import { textBinding, textFields } from "./text.js";
 import { collectionIdOfRef, restCollectionId } from "./variables.js";
 
 export interface ToRestOptions {
@@ -37,6 +38,8 @@ interface Ctx {
   /** Component and style ids the converted tree shows or refers to. */
   usedComponents: Set<string>;
   usedStyles: Set<string>;
+  /** Each converted node's painted area, clipped, even where REST reports null (masks, operands). */
+  painted: WeakMap<object, Rect | null>;
 }
 
 /** What a node inherits from the nodes above it in the expanded tree. */
@@ -54,6 +57,10 @@ interface Scope {
   outer: OuterOverride[];
   /** Product of the uniformScaleFactor of enclosing instances. */
   scale: number;
+  /** The area clipping frames and masks above leave visible; absent for none, null for nothing. */
+  clip?: Rect | null;
+  /** Inside a boolean operation: the operation paints, its operands do not. */
+  operand?: boolean;
 }
 
 interface OuterOverride {
@@ -94,12 +101,6 @@ const VARIABLE_FIELDS: Record<string, [string, string?]> = {
   BORDER_LEFT_WEIGHT: ["individualStrokeWeights", "left"],
   BORDER_RIGHT_WEIGHT: ["individualStrokeWeights", "right"],
   TEXT_DATA: ["characters"],
-};
-
-const TEXT_VARIABLE_FIELDS: Record<string, string> = {
-  FONT_FAMILY: "fontFamily", FONT_SIZE: "fontSize", FONT_STYLE: "fontStyle", FONT_WEIGHT: "fontWeight",
-  LETTER_SPACING: "letterSpacing", LINE_HEIGHT: "lineHeight", PARAGRAPH_SPACING: "paragraphSpacing",
-  PARAGRAPH_INDENT: "paragraphIndent",
 };
 
 /** The REST fields an instance override of each kiwi field shows up as. */
@@ -328,17 +329,22 @@ function styles(ctx: Ctx, n: any, type: string): Record<string, string> | undefi
   return Object.keys(out).length ? out : undefined;
 }
 
-function boundVariables(n: any): Record<string, any> | undefined {
+function boundVariables(n: any, textStyle?: any): Record<string, any> | undefined {
   const out: any = {};
   for (const e of n.variableConsumptionMap?.entries ?? []) {
+    const text = textBinding(e);
+    if (text) { (out[text[0]] ??= []).push(text[1]); continue; }
     const alias = variableAlias(e?.variableData);
     if (!alias) continue;
-    const text = TEXT_VARIABLE_FIELDS[e.variableField];
-    if (text) { (out[text] ??= []).push(alias); continue; }
     const [key, sub] = VARIABLE_FIELDS[e.variableField] ?? [];
     if (!key) continue;
     if (sub) (out[key] ??= {})[sub] = alias;
     else out[key] = alias;
+  }
+  // A text style's own bindings show on the text that uses it.
+  for (const e of textStyle?.variableConsumptionMap?.entries ?? []) {
+    const text = textBinding(e);
+    if (text && !out[text[0]]) out[text[0]] = [text[1]];
   }
   const paintAliases = (list: any[] | undefined) =>
     (list ?? []).map((p) => variableAlias(p?.colorVar)).filter(Boolean);
@@ -717,7 +723,7 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
 
   const refs = propertyReferences(ctx, n, scope.propOwner);
   if (refs) out.componentPropertyReferences = refs;
-  const bound = boundVariables(n);
+  const bound = boundVariables(n, type === "TEXT" ? styleNode(ctx, n.styleIdForText) : undefined);
   if (bound) out.boundVariables = bound;
   const explicit = explicitVariableModes(ctx, n);
   if (explicit) out.explicitVariableModes = explicit;
@@ -785,7 +791,9 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
   if (fot) out.fillOverrideTable = fot;
   if (ctx.geometry) {
     out.fillGeometry = geometry(ctx, n.fillGeometry);
-    out.strokeGeometry = geometry(ctx, n.strokeGeometry);
+    // REST outlines only strokes that show.
+    const stroked = out.strokes.some((p: any) => p.visible !== false);
+    out.strokeGeometry = stroked ? geometry(ctx, n.strokeGeometry) : [];
   }
   const st = styles(ctx, n, type);
   if (st) {
@@ -796,7 +804,6 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
   if (type === "INSTANCE" && out.componentId) ctx.usedComponents.add(out.componentId);
 
   out.absoluteBoundingBox = boundingBox(abs, size.x, size.y);
-  out.absoluteRenderBounds = hidden ? null : out.absoluteBoundingBox;
   out.constraints = {
     vertical: CONSTRAINT_V[n.verticalConstraint ?? "MIN"] ?? "TOP",
     horizontal: CONSTRAINT_H[n.horizontalConstraint ?? "MIN"] ?? "LEFT",
@@ -849,10 +856,54 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
         : r.path.length === 0 ? ownOverrides(r.source, [])
         : [...scope.outer, ...ownOverrides(r.source, r.path.map(guidString))],
     };
-    out.children = r.children.map((c) => convert(ctx, c, childScope));
+    // A mask clips the siblings above it.
+    let clip = out.clipsContent ? intersect(out.absoluteBoundingBox, scope.clip) : scope.clip;
+    out.children = r.children.map((c) => {
+      const child = convert(ctx, c, { ...childScope, clip, operand: scope.operand || type === "BOOLEAN_OPERATION" });
+      if (child.isMask && !hidden && child.visible !== false) clip = ctx.painted.get(child) ?? null;
+      return child;
+    });
   }
+  out.absoluteRenderBounds = renderBounds(ctx, n, out, abs, hidden, scope);
   if (type === "SECTION") for (const k of Object.keys(out)) if (!SECTION_FIELDS.has(k)) delete out[k];
   return out;
+}
+
+/** The area the node paints (see bounds.ts); records it in `ctx.painted` and returns what REST reports. */
+function renderBounds(ctx: Ctx, n: any, out: any, abs: FigTransform, hidden: boolean, scope: Scope): Rest.Rectangle | null {
+  if (hidden) {
+    ctx.painted.set(out, null);
+    return null;
+  }
+  const shows = (paints: any[] | undefined) => (paints ?? []).some((p) => p.visible !== false && (p.opacity ?? 1) > 0);
+  let own: Rect | null = null;
+  if (out.type === "TEXT") {
+    const glyphs = glyphBounds(ctx.doc, n.derivedTextData, abs);
+    own = glyphs === undefined ? out.absoluteBoundingBox : glyphs;
+  } else {
+    const fill = geometryBounds(ctx.doc, n.fillGeometry, abs);
+    if (shows(out.fills)) own = fill;
+    if (shows(out.strokes) && out.strokeWeight > 0) {
+      const stroke = geometryBounds(ctx.doc, n.strokeGeometry, abs);
+      // Figma stores the whole stroke outline and clips an inside stroke to the fill.
+      own = union(own, out.strokeAlign === "INSIDE" && fill ? intersect(stroke, fill) : stroke);
+    }
+  }
+  // A frame always counts its own box, painted or not.
+  if (FRAME_LIKE.has(out.type) && out.type !== "GROUP") own = union(own, out.absoluteBoundingBox);
+  let all = own;
+  if (out.type !== "BOOLEAN_OPERATION") {
+    for (const c of out.children ?? []) {
+      // A mask paints nothing but still counts for its parent; a group counts
+      // its text's layout box as well as the glyphs.
+      let p = ctx.painted.get(c) ?? null;
+      if (out.type === "GROUP" && c.type === "TEXT" && p) p = union(p, intersect(c.absoluteBoundingBox, scope.clip));
+      all = union(all, p);
+    }
+  }
+  const painted = intersect(withEffects(all, out.effects ?? []), scope.clip);
+  ctx.painted.set(out, painted);
+  return out.isMask || scope.operand ? null : painted;
 }
 
 function componentMeta(n: any): any {
@@ -877,7 +928,7 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set() };
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap() };
   const document = convert(ctx, resolveTree(doc, root), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,
