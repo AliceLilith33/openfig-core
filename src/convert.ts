@@ -1,4 +1,5 @@
-import type { FigDocument, FigNode, FigGuid, FigPaint } from "./types.js";
+import type { FigDocument, FigNode, FigGuid } from "./types.js";
+import { positionAt, sortByPosition } from "./utils.js";
 
 export interface ConvertOptions {
   title?: string;
@@ -7,14 +8,29 @@ export interface ConvertOptions {
   wrap?: number;
 }
 
+/** Nested instances deeper than this are not expanded (guards malformed or cyclic symbols). */
+const MAX_INSTANCE_DEPTH = 32;
+
 function guidToString(guid: FigGuid): string {
   return `${guid.sessionID}:${guid.localID}`;
+}
+
+function sameGuid(a: FigGuid | undefined, b: FigGuid | undefined): boolean {
+  return !!a && !!b && a.sessionID === b.sessionID && a.localID === b.localID;
 }
 
 function safeDeepClone<T>(val: T): T {
   if (val === null || val === undefined) return val;
   if (val instanceof Uint8Array) {
     return new Uint8Array(val) as any;
+  }
+  // Object.keys() sees no entries on a Map or Set, so the generic object branch
+  // would turn `images` into `{}` and drop every image.
+  if (val instanceof Map) {
+    return new Map([...val].map(([k, v]) => [k, safeDeepClone(v)])) as any;
+  }
+  if (val instanceof Set) {
+    return new Set([...val].map(safeDeepClone)) as any;
   }
   if (Array.isArray(val)) {
     return val.map(safeDeepClone) as any;
@@ -29,6 +45,98 @@ function safeDeepClone<T>(val: T): T {
   return val;
 }
 
+/** Children of `id` in layer order, without relying on how the map was built. */
+function orderedChildren(doc: FigDocument, id: string): FigNode[] {
+  return sortByPosition([...(doc.childrenMap.get(id) ?? [])]);
+}
+
+function hasAncestorOfType(doc: FigDocument, node: FigNode, type: string): boolean {
+  const seen = new Set<string>();
+  let parentGuid = node.parentIndex?.guid;
+  while (parentGuid) {
+    const pid = guidToString(parentGuid);
+    if (seen.has(pid)) return false;
+    seen.add(pid);
+    const parent = doc.nodeMap.get(pid);
+    if (!parent) return false;
+    if (parent.type === type) return true;
+    parentGuid = parent.parentIndex?.guid;
+  }
+  return false;
+}
+
+/**
+ * Live slides in presentation order.
+ *
+ * Positions only order siblings, so slides are collected by walking
+ * SLIDE_GRID → SLIDE_ROW → (MODULE) → SLIDE in position order. Comparing
+ * positions across parents is meaningless: in a deck where every slide sits in
+ * its own MODULE, every slide's position is `!`.
+ */
+function collectSlidesInOrder(doc: FigDocument): FigNode[] {
+  const ordered: FigNode[] = [];
+  const seen = new Set<string>();
+
+  const visit = (id: string) => {
+    for (const child of orderedChildren(doc, id)) {
+      if (child.phase === "REMOVED") continue;
+      const childId = guidToString(child.guid);
+      if (child.type === "SLIDE") {
+        if (!seen.has(childId)) {
+          seen.add(childId);
+          ordered.push(child);
+        }
+      } else if (child.type === "SLIDE_ROW" || child.type === "MODULE") {
+        visit(childId);
+      }
+    }
+  };
+
+  for (const grid of doc.nodes) {
+    if (grid.type === "SLIDE_GRID" && grid.phase !== "REMOVED") visit(guidToString(grid.guid));
+  }
+
+  // Slides outside any grid have no presentation order to recover; keep them in
+  // file order after the ordered ones. Slides under a grid that the walk did not
+  // reach sit below a removed row or module and are dropped.
+  for (const node of doc.nodes) {
+    if (node.type !== "SLIDE" || node.phase === "REMOVED") continue;
+    if (seen.has(guidToString(node.guid))) continue;
+    if (hasAncestorOfType(doc, node, "SLIDE_GRID")) continue;
+    seen.add(guidToString(node.guid));
+    ordered.push(node);
+  }
+
+  return ordered;
+}
+
+/** A symbol override whose `path` is relative to the symbol scope being baked. */
+interface ScopedOverride {
+  path: FigGuid[];
+  data: any;
+}
+
+function overridesOf(instance: FigNode): ScopedOverride[] {
+  const overrides: any[] = instance.symbolData?.symbolOverrides ?? [];
+  return overrides
+    .filter((o) => o?.guidPath?.guids?.length)
+    .map((o) => ({ path: o.guidPath.guids as FigGuid[], data: o }));
+}
+
+function applyOverride(clone: FigNode, override: any): void {
+  if (override.textData && clone.textData) {
+    let chars = override.textData.characters || "";
+    if (chars === "") chars = " "; // Prevent Figma silent crashes
+    clone.textData.characters = chars;
+  }
+  if (override.fillPaints) {
+    clone.fillPaints = safeDeepClone(override.fillPaints);
+  }
+  if (override.strokePaints) {
+    clone.strokePaints = safeDeepClone(override.strokePaints);
+  }
+}
+
 export function convertDeckToFig(
   deckDoc: FigDocument,
   options: ConvertOptions = {}
@@ -40,15 +148,8 @@ export function convertDeckToFig(
     wrap = 5,
   } = options;
 
-  // 1. Find all active slide nodes
-  const activeSlides = deckDoc.nodes
-    .filter((n) => n.type === "SLIDE" && n.phase !== "REMOVED")
-    // Sort by lexical order of their parentIndex.position or parent MODULE's position if nested
-    .sort((a, b) => {
-      const posA = a.parentIndex?.position ?? "";
-      const posB = b.parentIndex?.position ?? "";
-      return posA.localeCompare(posB);
-    });
+  // 1. Find all active slide nodes, in presentation order
+  const activeSlides = collectSlidesInOrder(deckDoc);
 
   // Calculate maximum local ID in the source document
   let maxLocalId = 0;
@@ -107,13 +208,109 @@ export function convertDeckToFig(
     return newIdx;
   }
 
+  /**
+   * Clone `node` and its live descendants under `parentGuid`, giving every clone
+   * a fresh GUID, and push them in pre-order (parents before children).
+   *
+   * `overrides` carry paths relative to the symbol scope `node` belongs to; a
+   * path segment names a node by its `overrideKey`, falling back to its `guid`
+   * for nodes that have none. A nested INSTANCE opens a new scope: it is
+   * detached into a FRAME, and its symbol's children are baked under it with
+   * the instance's own overrides followed by the outer ones addressed through
+   * it — later entries win, so the outer override takes precedence.
+   *
+   * `symbolStack` lists the symbols being expanded; it is non-empty exactly when
+   * `node` comes from a symbol rather than from the slide itself.
+   */
+  function bakeNode(
+    node: FigNode,
+    parentGuid: FigGuid,
+    overrides: ScopedOverride[],
+    symbolStack: string[],
+    position?: string,
+  ): void {
+    if (node.phase === "REMOVED") return;
+
+    const clone = safeDeepClone(node);
+    clone.guid = generateGuid();
+    clone.phase = "CREATED";
+    clone.parentIndex = {
+      ...(clone.parentIndex ?? {}),
+      guid: parentGuid,
+      position: position ?? clone.parentIndex?.position ?? "!",
+    };
+
+    if (symbolStack.length > 0) {
+      // Remove slide-scaffolding parameters
+      delete clone.slideThumbnailHash;
+      delete clone.editInfo;
+      delete clone.prototypeInteractions;
+    }
+
+    const key: FigGuid = node.overrideKey ?? node.guid;
+    const direct = overrides.filter((o) => o.path.length === 1 && sameGuid(o.path[0], key));
+
+    if (node.type === "INSTANCE") {
+      let symbolGuid: FigGuid | undefined = node.symbolData?.symbolID;
+      for (const o of direct) {
+        if (o.data.overriddenSymbolID) symbolGuid = o.data.overriddenSymbolID; // instance swap
+      }
+
+      // Detach: the symbol is not carried into the output, so a live INSTANCE
+      // would reference nothing.
+      clone.type = "FRAME";
+      delete clone.symbolData;
+      delete clone.derivedSymbolData;
+      delete clone.overriddenSymbolID;
+      for (const o of direct) applyOverride(clone, o.data);
+      outputNodes.push(clone);
+
+      const throughThis = overrides
+        .filter((o) => o.path.length > 1 && sameGuid(o.path[0], key))
+        .map((o) => ({ path: o.path.slice(1), data: o.data }));
+      bakeSymbolChildren(symbolGuid, clone.guid, [...overridesOf(node), ...throughThis], symbolStack);
+      return;
+    }
+
+    for (const o of direct) applyOverride(clone, o.data);
+    outputNodes.push(clone);
+
+    for (const child of orderedChildren(deckDoc, guidToString(node.guid))) {
+      bakeNode(child, clone.guid, overrides, symbolStack);
+    }
+  }
+
+  function bakeSymbolChildren(
+    symbolGuid: FigGuid | undefined,
+    parentGuid: FigGuid,
+    overrides: ScopedOverride[],
+    symbolStack: string[],
+  ): void {
+    for (const { node, overrides: o, symbolStack: s } of symbolChildEntries(symbolGuid, overrides, symbolStack)) {
+      bakeNode(node, parentGuid, o, s);
+    }
+  }
+
+  function symbolChildEntries(
+    symbolGuid: FigGuid | undefined,
+    overrides: ScopedOverride[],
+    symbolStack: string[],
+  ): Array<{ node: FigNode; overrides: ScopedOverride[]; symbolStack: string[] }> {
+    if (!symbolGuid) return [];
+    const symId = guidToString(symbolGuid);
+    if (symbolStack.includes(symId) || symbolStack.length >= MAX_INSTANCE_DEPTH) return [];
+    if (!deckDoc.nodeMap.has(symId)) return [];
+    const stack = [...symbolStack, symId];
+    return orderedChildren(deckDoc, symId).map((node) => ({ node, overrides, symbolStack: stack }));
+  }
+
   // 3. Process each slide
   const totalSlides = activeSlides.length;
   const paddingWidth = Math.max(2, String(totalSlides).length);
 
   activeSlides.forEach((slide, index) => {
     const slideId = guidToString(slide.guid);
-    
+
     // Determine frame size - standard is 1920x1080
     const slideSize = slide.size ?? { x: 1920, y: 1080 };
     const width = slideSize.x;
@@ -132,48 +329,16 @@ export function convertDeckToFig(
       y = 0;
     }
 
-    // Try to resolve frame name: first text node or fallback
-    let slideTitle = "";
-    const children = deckDoc.childrenMap.get(slideId) || [];
-    const instanceNode = children.find((c) => c.type === "INSTANCE");
-
-    if (instanceNode?.symbolData?.symbolID) {
-      const symGuidStr = guidToString(instanceNode.symbolData.symbolID);
-      const symNode = deckDoc.nodeMap.get(symGuidStr);
-      if (symNode) {
-        // Look in the symbol subtree for the first text node
-        const firstText = findFirstTextNode(deckDoc, symGuidStr);
-        if (firstText) {
-          // Check if there is an override in the instance for this text node
-          const originalTextGuid = firstText.guid;
-          const overrides = instanceNode.symbolData?.symbolOverrides || [];
-          const ov = overrides.find(
-            (o: any) =>
-              o.guidPath?.guids?.length === 1 &&
-              o.guidPath.guids[0].sessionID === originalTextGuid.sessionID &&
-              o.guidPath.guids[0].localID === originalTextGuid.localID &&
-              o.textData?.characters
-          );
-          slideTitle = ov?.textData?.characters || firstText.textData?.characters || "";
-        }
-      }
-    }
-
-    // Clean up title
-    slideTitle = slideTitle.trim();
-    const frameIndexStr = String(index + 1).padStart(paddingWidth, "0");
-    const frameName = slideTitle ? `${frameIndexStr} · ${slideTitle}` : `${frameIndexStr} · Slide ${frameIndexStr}`;
-
     // Create the slide FRAME
     const frameGuid = generateGuid();
     const frameNode: FigNode = {
       guid: frameGuid,
       type: "FRAME",
-      name: frameName,
+      name: "",
       phase: "CREATED",
       parentIndex: {
         guid: canvasGuid,
-        position: String.fromCharCode(0x21 + index),
+        position: positionAt(index),
       },
       size: { x: width, y: height },
       transform: { m00: 1, m01: 0, m02: x, m10: 0, m11: 1, m12: y },
@@ -190,153 +355,48 @@ export function convertDeckToFig(
 
     outputNodes.push(frameNode);
 
-    // 4. Bake the INSTANCE contents into the frame
-    if (instanceNode && instanceNode.symbolData?.symbolID) {
-      const symGuidStr = guidToString(instanceNode.symbolData.symbolID);
-      const symbolNode = deckDoc.nodeMap.get(symGuidStr);
-
-      if (symbolNode) {
-        // Collect all nodes in the symbol subtree
-        const subtree: FigNode[] = [];
-        const visited = new Set<string>();
-
-        function collectSubtree(id: string) {
-          if (visited.has(id)) return;
-          visited.add(id);
-
-          const node = deckDoc.nodeMap.get(id);
-          if (!node || node.phase === "REMOVED") return;
-          subtree.push(node);
-
-          const kids = deckDoc.childrenMap.get(id) || [];
-          for (const kid of kids) {
-            collectSubtree(guidToString(kid.guid));
-          }
+    // 4. Bake the slide's children into the frame. A slide-level INSTANCE is
+    // flattened: its symbol's children land directly in the frame, in the
+    // instance's place. Positions are reassigned across the combined list —
+    // flattened children and slide children come from different sibling scopes,
+    // so their original positions do not interleave meaningfully.
+    const slideChildren = orderedChildren(deckDoc, slideId).filter((c) => c.phase !== "REMOVED");
+    const titleInstance = slideChildren.find((c) => c.type === "INSTANCE");
+    const entries: Array<{
+      node: FigNode;
+      overrides: ScopedOverride[];
+      symbolStack: string[];
+      owner: FigNode;
+    }> = [];
+    for (const child of slideChildren) {
+      if (child.type === "INSTANCE" && child.symbolData?.symbolID && deckDoc.nodeMap.has(guidToString(child.symbolData.symbolID))) {
+        for (const entry of symbolChildEntries(child.symbolData.symbolID, overridesOf(child), [])) {
+          entries.push({ ...entry, owner: child });
         }
-
-        // Collect children of the SYMBOL node, but not the SYMBOL node itself
-        const symbolChildren = deckDoc.childrenMap.get(symGuidStr) || [];
-        for (const child of symbolChildren) {
-          collectSubtree(guidToString(child.guid));
-        }
-
-        // Create ID remap map for cloned symbol subtree
-        const idRemap = new Map<string, FigGuid>();
-        for (const node of subtree) {
-          idRemap.set(guidToString(node.guid), generateGuid());
-        }
-
-        // Clone and apply overrides
-        const clonedSubtree = subtree.map((node) => {
-          const clone = safeDeepClone(node);
-          const origIdStr = guidToString(node.guid);
-          const newGuid = idRemap.get(origIdStr)!;
-          clone.guid = newGuid;
-          clone.phase = "CREATED";
-
-          // Remove slide-scaffolding parameters
-          delete clone.slideThumbnailHash;
-          delete clone.editInfo;
-          delete clone.prototypeInteractions;
-
-          // Re-parent
-          if (clone.parentIndex?.guid) {
-            const parentIdStr = guidToString(clone.parentIndex.guid);
-            if (parentIdStr === symGuidStr) {
-              // Root of subtree is parented directly to the slide's new FRAME
-              clone.parentIndex.guid = frameGuid;
-            } else if (idRemap.has(parentIdStr)) {
-              // Internal parent reference
-              clone.parentIndex.guid = idRemap.get(parentIdStr)!;
-            }
-          }
-
-          // Apply overrides from the instance
-          const overrides = instanceNode.symbolData?.symbolOverrides || [];
-          const matchingOverrides = overrides.filter((o: any) => {
-            if (!o.guidPath?.guids?.length) return false;
-            const lastGuid = o.guidPath.guids[o.guidPath.guids.length - 1];
-            return (
-              lastGuid.sessionID === node.guid.sessionID &&
-              lastGuid.localID === node.guid.localID
-            );
-          });
-
-          for (const ov of matchingOverrides) {
-            if (ov.textData && clone.textData) {
-              let chars = ov.textData.characters || "";
-              if (chars === "") chars = " "; // Prevent Figma silent crashes
-              clone.textData.characters = chars;
-            }
-            if (ov.fillPaints) {
-              clone.fillPaints = safeDeepClone(ov.fillPaints);
-            }
-            if (ov.strokePaints) {
-              clone.strokePaints = safeDeepClone(ov.strokePaints);
-            }
-          }
-
-          return clone;
-        });
-
-        // Push baked nodes to output list
-        outputNodes.push(...clonedSubtree);
+      } else {
+        entries.push({ node: child, overrides: [], symbolStack: [], owner: child });
       }
     }
 
-    // 5. Clone and re-parent slide sibling nodes (non-INSTANCE children of the SLIDE node)
-    for (const sibling of children) {
-      if (sibling.type === "INSTANCE" || sibling.phase === "REMOVED") continue;
-
-      const subtree: FigNode[] = [];
-      const visited = new Set<string>();
-
-      function collectSiblingSubtree(id: string) {
-        if (visited.has(id)) return;
-        visited.add(id);
-
-        const node = deckDoc.nodeMap.get(id);
-        if (!node || node.phase === "REMOVED") return;
-        subtree.push(node);
-
-        const kids = deckDoc.childrenMap.get(id) || [];
-        for (const kid of kids) {
-          collectSiblingSubtree(guidToString(kid.guid));
-        }
+    // The frame is named after the first text in the first slide-level instance,
+    // as it reads once overrides are applied.
+    let slideTitle = "";
+    entries.forEach((entry, i) => {
+      const start = outputNodes.length;
+      bakeNode(entry.node, frameGuid, entry.overrides, entry.symbolStack, positionAt(i));
+      if (!slideTitle && entry.owner === titleInstance) {
+        const firstText = outputNodes
+          .slice(start)
+          .find((n) => n.type === "TEXT" && n.textData?.characters);
+        slideTitle = firstText?.textData?.characters?.trim() ?? "";
       }
+    });
 
-      collectSiblingSubtree(guidToString(sibling.guid));
-
-      // Remap GUIDs to ensure uniqueness and clean reparenting
-      const sibIdRemap = new Map<string, FigGuid>();
-      for (const node of subtree) {
-        sibIdRemap.set(guidToString(node.guid), generateGuid());
-      }
-
-      const clonedSibNodes = subtree.map((node) => {
-        const clone = safeDeepClone(node);
-        const origIdStr = guidToString(node.guid);
-        const newGuid = sibIdRemap.get(origIdStr)!;
-        clone.guid = newGuid;
-        clone.phase = "CREATED";
-
-        if (clone.parentIndex?.guid) {
-          const parentIdStr = guidToString(clone.parentIndex.guid);
-          if (parentIdStr === slideId) {
-            clone.parentIndex.guid = frameGuid;
-          } else if (sibIdRemap.has(parentIdStr)) {
-            clone.parentIndex.guid = sibIdRemap.get(parentIdStr)!;
-          }
-        }
-
-        return clone;
-      });
-
-      outputNodes.push(...clonedSibNodes);
-    }
+    const frameIndexStr = String(index + 1).padStart(paddingWidth, "0");
+    frameNode.name = slideTitle ? `${frameIndexStr} · ${slideTitle}` : `${frameIndexStr} · Slide ${frameIndexStr}`;
   });
 
-  // 6. Keep global variables or theme metadata if present
+  // 5. Keep global variables or theme metadata if present
   const globalSupportTypes = new Set([
     "VARIABLE",
     "VARIABLE_SET",
@@ -367,6 +427,7 @@ export function convertDeckToFig(
     }
     childrenMap.get(pid)!.push(node);
   }
+  for (const children of childrenMap.values()) sortByPosition(children);
 
   // Carry over meta and images
   const targetMeta = safeDeepClone(deckDoc.meta) || {};
@@ -430,16 +491,3 @@ export function convertDeckToFig(
   return newDoc;
 }
 
-/** Helper to find the first TEXT node in a component subtree recursively. */
-function findFirstTextNode(doc: FigDocument, id: string): FigNode | null {
-  const node = doc.nodeMap.get(id);
-  if (!node || node.phase === "REMOVED") return null;
-  if (node.type === "TEXT" && node.textData?.characters) return node;
-
-  const children = doc.childrenMap.get(id) || [];
-  for (const child of children) {
-    const found = findFirstTextNode(doc, guidToString(child.guid));
-    if (found) return found;
-  }
-  return null;
-}

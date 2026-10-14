@@ -54,6 +54,10 @@ function positionAt(index) {
 Indices below the ceiling stay byte-identical to the naive single-character
 scheme, so adopting this does not move existing output.
 
+openfig-core exports this as `positionAt(index)`, along with `comparePosition`
+and `sortByPosition` for reading positions back in Figma's order. Never compare
+positions with `localeCompare` — collation reorders punctuation and case.
+
 Reference implementation and the measurements behind it: openfig-cli
 `lib/core/node-helpers.mjs` and its `docs/figma-behaviour.md`.
 

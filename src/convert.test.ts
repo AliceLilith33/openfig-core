@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { convertDeckToFig } from "./convert.js";
+import { createFigZip } from "./encoder.js";
+import { positionAt } from "./utils.js";
 import type { FigDocument, FigNode } from "./types.js";
 
 describe("convertDeckToFig", () => {
@@ -233,5 +235,165 @@ describe("convertDeckToFig", () => {
       const pidStr = `${node.parentIndex!.guid.sessionID}:${node.parentIndex!.guid.localID}`;
       expect(designFig.nodeMap.has(pidStr)).toBe(true);
     }
+  });
+});
+
+// ─── Builders for the regression tests below ────────────────────────────────
+
+const gid = (localID: number, sessionID = 1) => ({ sessionID, localID });
+const key = (g: { sessionID: number; localID: number }) => `${g.sessionID}:${g.localID}`;
+
+function child(localID: number, type: string, parent: number, position: string, extra: Partial<FigNode> = {}): FigNode {
+  return { guid: gid(localID), type, name: `${type} ${localID}`, parentIndex: { guid: gid(parent), position }, ...extra };
+}
+
+function mockDoc(nodes: FigNode[], extra: Partial<FigDocument> = {}): FigDocument {
+  const nodeMap = new Map<string, FigNode>();
+  const childrenMap = new Map<string, FigNode[]>();
+  for (const node of nodes) nodeMap.set(key(node.guid), node);
+  for (const node of nodes) {
+    if (!node.parentIndex?.guid) continue;
+    const pid = key(node.parentIndex.guid);
+    if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+    childrenMap.get(pid)!.push(node);
+  }
+  return {
+    header: { prelude: "fig-deck", version: 101 },
+    nodes,
+    nodeMap,
+    childrenMap,
+    schema: {},
+    compiledSchema: {},
+    rawChunks: [new Uint8Array([1]), new Uint8Array([2])],
+    message: { nodeChanges: nodes, blobs: [] },
+    images: new Map(),
+    ...extra,
+  };
+}
+
+/** DOCUMENT 0 > CANVAS 1 > SLIDE_GRID 2 > SLIDE_ROW 3 */
+const scaffold = (): FigNode[] => [
+  { guid: gid(0), type: "DOCUMENT", name: "Document" },
+  child(1, "CANVAS", 0, "!"),
+  child(2, "SLIDE_GRID", 1, "!"),
+  child(3, "SLIDE_ROW", 2, "!"),
+];
+
+const textUnder = (doc: FigDocument, frame: FigNode) => {
+  const out: FigNode[] = [];
+  const walk = (id: string) => {
+    for (const c of doc.childrenMap.get(id) ?? []) {
+      if (c.type === "TEXT") out.push(c);
+      walk(key(c.guid));
+    }
+  };
+  walk(key(frame.guid));
+  return out.map((n) => n.textData?.characters);
+};
+
+describe("convertDeckToFig regressions", () => {
+  it("keeps images as a Map that createFigZip can package", () => {
+    const images = new Map([["abc", new Uint8Array([1, 2, 3])]]);
+    const out = convertDeckToFig(mockDoc([...scaffold(), child(10, "SLIDE", 3, "!")], { images }));
+
+    expect(out.images).toBeInstanceOf(Map);
+    expect([...out.images.keys()]).toEqual(["abc"]);
+    expect(out.images.get("abc")).not.toBe(images.get("abc")); // cloned, not shared
+    expect(() => createFigZip({ canvasFig: new Uint8Array(4), images: out.images })).not.toThrow();
+  });
+
+  it("keeps frame positions within ! to ~ and in slide order past 94 slides", () => {
+    const slides = Array.from({ length: 200 }, (_, i) => child(1000 + i, "SLIDE", 3, positionAt(i)));
+    const out = convertDeckToFig(mockDoc([...scaffold(), ...slides]));
+
+    const frames = out.nodes.filter((n) => n.type === "FRAME");
+    expect(frames).toHaveLength(200);
+    for (const frame of frames) expect(frame.parentIndex!.position).toMatch(/^[!-~]+$/);
+    const canvas = out.nodes.find((n) => n.type === "CANVAS")!;
+    const ordered = out.childrenMap.get(key(canvas.guid))!;
+    expect(ordered.map((f) => f.name)).toEqual(frames.map((f) => f.name));
+  });
+
+  it("orders slides by walking the grid, not by comparing positions across parents", () => {
+    // Every slide sits alone in a MODULE at position "!"; only the MODULE
+    // positions carry the order, and the array lists them backwards.
+    const nodes = [
+      ...scaffold(),
+      child(23, "SLIDE", 13, "!", { name: "third" }),
+      child(13, "MODULE", 3, "~"),
+      child(22, "SLIDE", 12, "!", { name: "second" }),
+      child(12, "MODULE", 3, "_"),
+      child(21, "SLIDE", 11, "!", { name: "first" }),
+      child(11, "MODULE", 3, "A"),
+      child(24, "SLIDE", 14, "!", { name: "removed" }),
+      child(14, "MODULE", 3, "B", { phase: "REMOVED" }),
+    ];
+    for (const [slide, text] of [[21, "one"], [22, "two"], [23, "three"]] as const) {
+      nodes.push(child(slide * 10, "TEXT", slide, "!", { textData: { characters: text } }));
+    }
+
+    const out = convertDeckToFig(mockDoc(nodes));
+    const frames = out.nodes.filter((n) => n.type === "FRAME");
+    expect(frames.map((f) => textUnder(out, f))).toEqual([["one"], ["two"], ["three"]]);
+  });
+
+  it("matches overrides by overrideKey, including through nested instances", () => {
+    const nodes = [
+      ...scaffold(),
+      // Symbol 200: a TEXT. Its overrideKey differs from its guid, as in real files.
+      { guid: gid(200), type: "SYMBOL", name: "Inner" },
+      child(201, "TEXT", 200, "!", { overrideKey: gid(1, 9), textData: { characters: "inner default" } }),
+      // Symbol 100: a title TEXT and a nested instance of 200.
+      { guid: gid(100), type: "SYMBOL", name: "Outer" },
+      child(101, "TEXT", 100, "!", { overrideKey: gid(2, 9), textData: { characters: "title default" } }),
+      child(102, "INSTANCE", 100, '"', {
+        overrideKey: gid(3, 9),
+        symbolData: {
+          symbolID: gid(200),
+          symbolOverrides: [{ guidPath: { guids: [gid(1, 9)] }, textData: { characters: "set by nested" } }],
+        },
+      }),
+      // Slide 10 overrides the title and, through 3:9, the nested text.
+      child(10, "SLIDE", 3, "!"),
+      child(11, "INSTANCE", 10, "!", {
+        symbolData: {
+          symbolID: gid(100),
+          symbolOverrides: [
+            { guidPath: { guids: [gid(2, 9)] }, textData: { characters: "Slide title" } },
+            { guidPath: { guids: [gid(3, 9), gid(1, 9)] }, textData: { characters: "set by slide" } },
+          ],
+        },
+      }),
+      // Slide 20 overrides nothing: the nested instance's own override applies.
+      child(20, "SLIDE", 3, '"'),
+      child(21, "INSTANCE", 20, "!", { symbolData: { symbolID: gid(100), symbolOverrides: [] } }),
+    ];
+
+    const out = convertDeckToFig(mockDoc(nodes));
+    const [frame1, frame2] = out.nodes.filter((n) => n.type === "FRAME" && key(n.parentIndex!.guid) === key(out.nodes[1].guid));
+
+    expect(frame1.name).toBe("01 · Slide title");
+    expect(textUnder(out, frame1)).toEqual(["Slide title", "set by slide"]);
+    expect(frame2.name).toBe("02 · title default");
+    expect(textUnder(out, frame2)).toEqual(["title default", "set by nested"]);
+
+    // Nested instances are detached: nothing references a symbol that was not carried over.
+    expect(out.nodes.filter((n) => n.type === "INSTANCE" || n.type === "SYMBOL")).toHaveLength(0);
+    for (const node of out.nodes) {
+      if (node.parentIndex) expect(out.nodeMap.has(key(node.parentIndex.guid))).toBe(true);
+    }
+  });
+
+  it("stops expanding a symbol that contains an instance of itself", () => {
+    const nodes = [
+      ...scaffold(),
+      { guid: gid(100), type: "SYMBOL", name: "Loop" },
+      child(101, "INSTANCE", 100, "!", { symbolData: { symbolID: gid(100) } }),
+      child(10, "SLIDE", 3, "!"),
+      child(11, "INSTANCE", 10, "!", { symbolData: { symbolID: gid(100) } }),
+    ];
+    const out = convertDeckToFig(mockDoc(nodes));
+    // The slide instance flattens to 100's child; that child's expansion of 100 is cut off.
+    expect(out.nodes.filter((n) => n.name === "INSTANCE 101")).toHaveLength(1);
   });
 });

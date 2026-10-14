@@ -2,7 +2,7 @@ export { parseFig, parseFigBinary } from "./parser.js";
 export { encodeFigParts, assembleCanvasFig, createFigZip } from "./encoder.js";
 export { convertDeckToFig } from "./convert.js";
 export { createEmptyFigDoc } from "./template.js";
-export { nodeId } from "./utils.js";
+export { nodeId, comparePosition, sortByPosition, positionAt } from "./utils.js";
 export { extractRenderableGradientFill, resolveGradientGeometry } from "./gradient.js";
 export {
   appendVectorPayloadToDocument,

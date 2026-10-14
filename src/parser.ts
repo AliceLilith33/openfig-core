@@ -19,7 +19,7 @@ import { unzipSync, inflateSync } from "fflate";
 import { decodeBinarySchema, compileSchema } from "kiwi-schema";
 import { decompress as zstdDecompress } from "fzstd";
 import type { FigDocument, FigNode } from "./types.js";
-import { nodeId } from "./utils.js";
+import { nodeId, sortByPosition } from "./utils.js";
 
 /**
  * Parse raw canvas.fig binary data (the blob inside the ZIP).
@@ -95,6 +95,9 @@ export function parseFigBinary(data: Uint8Array): FigDocument {
     if (!childrenMap.has(pid)) childrenMap.set(pid, []);
     childrenMap.get(pid)!.push(node);
   }
+
+  // nodeChanges order is not layer order — siblings are ordered by position.
+  for (const children of childrenMap.values()) sortByPosition(children);
 
   return {
     header: { prelude: prelude.trim(), version },

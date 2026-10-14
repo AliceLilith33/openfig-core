@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { parseFig, parseFigBinary, nodeId } from "./index.js";
+import { parseFig, parseFigBinary, nodeId, createEmptyFigDoc, encodeFigParts, assembleCanvasFig } from "./index.js";
+import { deflateSync } from "fflate";
 
 const fixturesDir = join(__dirname, "..", "test-fixtures");
 
@@ -95,5 +96,33 @@ describe("nodeId", () => {
 
   it("returns null for missing guid", () => {
     expect(nodeId({} as any)).toBeNull();
+  });
+});
+
+describe("childrenMap ordering", () => {
+  it("orders siblings by position, not by nodeChanges order", () => {
+    const doc = createEmptyFigDoc();
+    const page = doc.message.nodeChanges.find((n: any) => n.type === "CANVAS" && n.phase !== "REMOVED");
+    const frame = (localID: number, position: string) => ({
+      guid: { sessionID: 77, localID },
+      phase: "CREATED",
+      type: "FRAME",
+      name: `pos ${position}`,
+      parentIndex: { guid: page.guid, position },
+      size: { x: 10, y: 10 },
+      transform: { m00: 1, m01: 0, m02: 0, m10: 0, m11: 1, m12: 0 },
+    });
+    // Out of order in the array, and "_" vs "A" is where locale collation disagrees.
+    doc.message.nodeChanges.push(frame(1, "_"), frame(2, "!"), frame(3, "A"), frame(4, "~"));
+
+    const parts = encodeFigParts(doc);
+    const reparsed = parseFigBinary(
+      assembleCanvasFig({ ...parts, messageCompressed: deflateSync(parts.messageRaw) }),
+    );
+
+    const names = (reparsed.childrenMap.get(nodeId(page)!) ?? [])
+      .filter((n) => n.guid.sessionID === 77)
+      .map((n) => n.name);
+    expect(names).toEqual(["pos !", "pos A", "pos _", "pos ~"]);
   });
 });

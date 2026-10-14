@@ -5,6 +5,26 @@ All notable changes to `openfig-core` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`childrenMap` listed siblings in `nodeChanges` order, not layer order.** `nodeChanges` is not sorted by `parentIndex.position`; 25 parents in one reference file came out reordered. `parseFigBinary` now sorts each sibling list by position, byte by byte, as Figma does.
+- **`convertDeckToFig` dropped every image.** The deep clone it used walks `Object.keys`, which sees nothing in a `Map`, so `images` came back as `{}` — and `createFigZip` then threw `input.images is not iterable`.
+- **`convertDeckToFig` wrote positions outside `!`–`~` past 94 slides**, which makes Figma reject the whole file. Frame positions now come from `positionAt`.
+- **`convertDeckToFig` could put slides out of order.** It sorted slides by their own positions with `localeCompare`, but positions only order siblings: in a deck where each slide sits in its own `MODULE`, every slide is at `!`. Slides are now collected by walking `SLIDE_GRID` → `SLIDE_ROW` → `MODULE` → `SLIDE` in position order. Slides under a removed row or module are no longer included.
+- **`convertDeckToFig` matched symbol overrides by `guid`.** Override paths address nodes by `overrideKey`, which differs from the guid on every overrideable node in the reference decks, so overrides on real files were not applied. Multi-segment paths are now resolved through each nested instance instead of by their last segment alone.
+- **`convertDeckToFig` left nested instances pointing at symbols it does not carry over.** Every instance is now baked: detached into a `FRAME`, with its symbol's children expanded under it and its overrides applied (outer overrides win; `overriddenSymbolID` swaps are honoured; cyclic symbols stop expanding). Every slide-level instance is baked, not only the first, and children of a slide are re-positioned so flattened instance content keeps its place among the slide's other children.
+
+### Added
+
+- `comparePosition`, `sortByPosition` and `positionAt` — read and write `parentIndex.position` in Figma's order.
+
+### Known limitations
+
+- `convertDeckToFig` applies only `textData.characters`, `fillPaints` and `strokePaints` from overrides; `componentPropAssignments` and `derivedSymbolData` are not resolved.
+- Variables copied by `convertDeckToFig` keep their parent, an internal canvas that is not carried over.
+
 ## [0.4.1] - 2026-08-01
 
 ### Fixed
