@@ -39,12 +39,14 @@ export interface ToRestOptions {
 /**
  * One line of a text as Figma laid it out, from `derivedTextData` (or, in
  * older files, `textData`): where it starts in the text's
- * characters, counted in code points, and its advance width in pixels,
- * trailing spaces included.
+ * characters, counted in code points, its advance width in pixels,
+ * trailing spaces included, and its baseline, in pixels from the top of the
+ * text's box.
  */
 export interface TextLine {
   start: number;
   width: number;
+  baseline: number;
 }
 
 export type RestFile = Pick<
@@ -749,7 +751,9 @@ function textLines(n: any): TextLine[] | undefined {
   if (!lines?.length) return undefined;
   const count = Array.from(n.textData?.characters ?? "").length;
   if (lines[lines.length - 1].endCharacter !== count) return undefined;
-  return lines.map((b) => ({ start: b.firstCharacter ?? 0, width: Math.round((b.width ?? 0) * 100) / 100 }));
+  // Figma rounds a width up to whole pixels: thousandths keep a hair over one.
+  const r = (v: number | undefined) => Math.round((v ?? 0) * 1000) / 1000;
+  return lines.map((b) => ({ start: b.firstCharacter ?? 0, width: r(b.width), baseline: r(b.position?.y) }));
 }
 
 function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {

@@ -255,7 +255,8 @@ describe("toDesignIR", () => {
     const doc = parseFig(new Uint8Array(readFileSync(join(__dirname, "..", "..", "test-fixtures", "instances", "medium-complex.fig"))));
     const textLines = new Map();
     const n = index(toDesignIR(toRestDocument(doc, { textLines }), { textLines }));
-    expect(n.get("1:93")!.text!.measuredLines).toEqual([{ start: 0, width: 208.43 }, { start: 20, width: 268.88 }]);
+    // Widths to thousandths (Figma rounds a hair over a whole pixel up), and each line's baseline.
+    expect(n.get("1:93")!.text!.measuredLines).toEqual([{ start: 0, width: 208.43, baseline: 24.108 }, { start: 20, width: 268.875, baseline: 57.108 }]);
     // Without the file's layout (from the REST API) there are none.
     expect(index(toDesignIR(toRestDocument(doc))).get("1:93")!.text).not.toHaveProperty("measuredLines");
   });

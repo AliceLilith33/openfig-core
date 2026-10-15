@@ -307,12 +307,13 @@ export interface IRText {
   /**
    * The lines Figma laid the text out in when the file was saved, measured
    * with Figma's own builds of the fonts: where each starts in `content`, in
-   * code points, and its width in pixels, trailing spaces included. Shows
-   * where Figma wrapped and how wide each line was; a browser with another
-   * build of a font measures a few percent differently. Absent when the file
-   * holds no layout for the text.
+   * code points, its width in pixels, trailing spaces included, and its
+   * baseline in pixels from the top of the box. Shows where Figma wrapped,
+   * how wide each line was and where it sat; a browser with another build of
+   * a font measures a few percent differently. Absent when the file holds no
+   * layout for the text.
    */
-  measuredLines?: Array<{ start: number; width: number }>;
+  measuredLines?: Array<{ start: number; width: number; baseline?: number }>;
 }
 
 export interface IRTextStyle {
