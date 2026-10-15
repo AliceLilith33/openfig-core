@@ -261,7 +261,7 @@ covered above:
 | `mask` | `alpha`, `vector` (by outline) or `luminance`. |
 | `layout` (flex) | Also `wrap`, `lineGap` (between wrapped lines), `alignContent`, `strokesInLayout` (borders take up space). |
 | `layout` (grid) | `rows`, `columns` as CSS track lists, `rowGap`, `columnGap`, `padding`. |
-| `text.lines` | Per line (paragraph): `list` (`ordered`, `unordered`), `indent` level, `start`, the number an ordered item shows where it restarts the count, and `paragraphSpacing`, the space after a paragraph that sets its own (Figma keeps a style for each paragraph; where it gives a spacing, that is the one laid out). `start` and `paragraphSpacing` come from the `.fig` only; REST has no such fields. |
+| `text.lines` | Per line (paragraph): `list` (`ordered`, `unordered`), `indent` level, `start`, the number an ordered item shows where it restarts the count, and `paragraphSpacing`, the space after a paragraph where it is not the text style's: one the paragraph sets itself (Figma keeps a style for each paragraph; where it gives a spacing, that is the one laid out), or else the spacing Figma takes for the whole text from its first character's style (a text starting with a heading in another style is spaced by the heading's). `start` and `paragraphSpacing` come from the `.fig` only; REST has no such fields. |
 | `text.maxLines`, `autoResize: "truncate"` | The text is cut with an ellipsis. |
 | `text.link`, `runs[].link` | A URL, or `#<node id>`. |
 | `propRefs` | Which component property drives `characters`, `visible` or `mainComponent`. |

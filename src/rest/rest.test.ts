@@ -142,6 +142,32 @@ describe("toRestDocument", () => {
     expect(paragraphSpacings.has("1:2")).toBe(false);
   });
 
+  it("spaces paragraphs by the text's first character, as Figma does", () => {
+    const paragraphSpacings = new Map<string, Record<string, number>>();
+    const font = { fontSize: 16, fontName: { family: "Inter", style: "Regular", postscript: "" } };
+    const text = (id: number, textData: any) => ({
+      id, parent: 100, type: "TEXT", styleIdForText: { guid: G(50) }, ...font,
+      textData: { characters: "a\nb\nc", lines: [{ styleId: 0 }, { styleId: 3 }, { styleId: 0 }], ...textData },
+    });
+    const table = [{ styleID: 1, styleIdForText: { guid: G(51) } }, { styleID: 2, paragraphSpacing: 4 }, { styleID: 3, paragraphSpacing: 24 }];
+    toRestDocument(docOf([
+      { id: 50, parent: 100, type: "TEXT", styleType: "TEXT", name: "Body", paragraphSpacing: 16, ...font },
+      { id: 51, parent: 100, type: "TEXT", styleType: "TEXT", name: "Heading", ...font },
+      // A heading first: its style sets no spacing, so the node's own (none), but where a paragraph sets its own.
+      text(1, { characterStyleIDs: [1, 0, 0, 0, 0], styleOverrideTable: table }),
+      // An override's 0 is no spacing either: the node's own.
+      { ...text(4, { characterStyleIDs: [4, 0, 0, 0, 0], styleOverrideTable: [...table, { styleID: 4, paragraphSpacing: 0 }] }), paragraphSpacing: 12 },
+      // A first character with its own spacing and no style.
+      text(2, { characterStyleIDs: [2, 0, 0, 0, 0], styleOverrideTable: table }),
+      // A first character in the node's style keeps the style's spacing.
+      text(3, { characterStyleIDs: [0, 1, 0, 0, 0], styleOverrideTable: table }),
+    ] as any), { paragraphSpacings });
+    expect(paragraphSpacings.get("1:1")).toEqual({ 0: 0, 1: 24, 2: 0 });
+    expect(paragraphSpacings.get("1:2")).toEqual({ 0: 4, 1: 24, 2: 4 });
+    expect(paragraphSpacings.get("1:3")).toEqual({ 1: 24 });
+    expect(paragraphSpacings.get("1:4")).toEqual({ 0: 12, 1: 24, 2: 12 });
+  });
+
   it("gives the line height of runs of Auto text in another font or size, apart from REST", () => {
     const meta = [
       { key: { family: "Inter", style: "Regular" }, fontLineHeight: 1.21 },

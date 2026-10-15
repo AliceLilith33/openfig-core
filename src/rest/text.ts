@@ -255,16 +255,25 @@ export function runLineHeights(node: any, lookup?: StyleLookup): Record<string, 
 }
 
 /**
- * The spacing after each paragraph that sets its own, by paragraph index:
- * a paragraph's `styleId` in `textData.lines` names a style override whose
- * `paragraphSpacing` Figma lays the paragraph out with. REST reports none.
+ * The spacing after each paragraph, by paragraph index, where it is not the
+ * node's: a paragraph's `styleId` in `textData.lines` names a style override
+ * whose `paragraphSpacing` Figma lays the paragraph out with. Other
+ * paragraphs take the spacing of the text's first character, as Figma does
+ * for the whole text: of the text style its override sets, or the
+ * override's own; when neither sets one (or the override's is 0), the node's
+ * own spacing, not its text style's. REST reports none.
  */
-export function paragraphSpacings(node: any): Record<string, number> | undefined {
+export function paragraphSpacings(node: any, lookup?: StyleLookup): Record<string, number> | undefined {
   const table = new Map<number, any>();
   for (const e of node.textData?.styleOverrideTable ?? []) if (e?.styleID) table.set(e.styleID, e);
+  const head = table.get(node.textData?.characterStyleIDs?.[0]);
+  const ref = textStyleRef(head);
+  const style: any = ref ? lookup?.(ref) : undefined;
+  // A style or override without a spacing (or the override's 0) leaves the node's own, not its style's.
+  const first: number | undefined = head && (style?.paragraphSpacing ?? (head.paragraphSpacing || undefined) ?? node.paragraphSpacing ?? 0);
   const out: Record<string, number> = {};
   (node.textData?.lines ?? []).forEach((l: any, i: number) => {
-    const v = l?.styleId ? table.get(l.styleId)?.paragraphSpacing : undefined;
+    const v = (l?.styleId ? table.get(l.styleId)?.paragraphSpacing : undefined) ?? first;
     if (v !== undefined) out[String(i)] = v;
   });
   return Object.keys(out).length ? out : undefined;

@@ -935,7 +935,7 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     if (ctx.listStarts && starts?.some((s) => s)) ctx.listStarts.set(id, starts);
     const heights = ctx.runLineHeights && runLineHeights(n, scaled ? undefined : (ref) => styleNode(ctx, ref));
     if (heights) ctx.runLineHeights!.set(id, heights);
-    const spacings = ctx.paragraphSpacings && paragraphSpacings(n);
+    const spacings = ctx.paragraphSpacings && paragraphSpacings(n, scaled ? undefined : (ref) => styleNode(ctx, ref));
     if (spacings) ctx.paragraphSpacings!.set(id, spacings);
   }
   if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
