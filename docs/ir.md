@@ -121,6 +121,9 @@ page:
   groups and instances that hold only vector shapes (at least one path, no
   text, images, effects, interactions or auto layout), are drawn as SVG:
   `asset` names an entry of `assets.svgs`, and the node's children are left out.
+  So are its fills and stroke, which the artwork draws, except a stroke where
+  the parent's auto layout counts strokes (`strokesInLayout`): it stays for
+  the space it takes, and is not to be drawn again.
   Frames and groups up to 160px (`iconMaxSize`), any instance, and anything
   marked for SVG export qualify. Identical artwork shares one entry. An
   entry's `width` and `height` are the node's; its `viewBox` grows past them,
@@ -201,7 +204,12 @@ the kept component definitions. `openfig-web ir --screen` writes this.
 - `style.letterSpacing`, `lineHeight`, `paragraphSpacing`, `paragraphIndent`
   and `listSpacing` are pixels; Figma's percent letter spacing is already
   multiplied by the font size. `lineHeightAuto` marks Figma's "Auto": the
-  font's own line height, given in pixels as Figma computes it.
+  font's own line height, given in pixels as Figma computes it (from the
+  lines Figma laid out where the file keeps no metrics for the font). In
+  such text a run in another font or size has its own `lineHeight`, from its
+  own font: Figma makes each line as tall as the tallest of its runs' line
+  heights, rounded to a whole pixel, and the text's own size sets no
+  minimum. With a fixed line height, every line has it.
 - `style.textTransform: "capitalize"` is Figma's title case; `small-caps` and
   `all-small-caps` map to `font-variant-caps`. `leadingTrim: "cap"` is CSS's
   `text-box: trim-both cap alphabetic`.

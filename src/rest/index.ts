@@ -17,7 +17,7 @@ import { findVariableSet, resolveVariableData } from "../variables.js";
 import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
 import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
 import { interactions } from "./interactions.js";
-import { textBinding, textFields, textStyleRef } from "./text.js";
+import { runLineHeights, textBinding, textFields, textStyleRef } from "./text.js";
 import { collectionIdOfRef, restCollectionId } from "./variables.js";
 
 export interface ToRestOptions {
@@ -34,6 +34,12 @@ export interface ToRestOptions {
    * REST has no field for it.
    */
   listStarts?: Map<string, number[]>;
+  /**
+   * Filled, when given, with the line height of each run of an "Auto" text
+   * that sets another font or size, by node id and style override id: Figma
+   * sizes such a run's lines by its own font. REST has no field for it.
+   */
+  runLineHeights?: Map<string, Record<string, number>>;
 }
 
 /**
@@ -66,6 +72,7 @@ interface Ctx {
   painted: WeakMap<object, Rect | null>;
   textLines?: Map<string, TextLine[]>;
   listStarts?: Map<string, number[]>;
+  runLineHeights?: Map<string, Record<string, number>>;
   /** SVG path of each geometry blob already written: instances share their components' blobs. */
   paths: Map<Uint8Array, string>;
 }
@@ -903,6 +910,8 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     if (lines) ctx.textLines!.set(id, lines);
     const starts: number[] | undefined = n.textData?.lines?.map((l: any) => l?.listStartOffset ?? 0);
     if (ctx.listStarts && starts?.some((s) => s)) ctx.listStarts.set(id, starts);
+    const heights = ctx.runLineHeights && runLineHeights(n, scaled ? undefined : (ref) => styleNode(ctx, ref));
+    if (heights) ctx.runLineHeights!.set(id, heights);
   }
   if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
   if (type === "ELLIPSE") {
@@ -1007,7 +1016,7 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, listStarts: options.listStarts, paths: new Map() };
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, listStarts: options.listStarts, runLineHeights: options.runLineHeights, paths: new Map() };
   const document = convert(ctx, resolveTree(doc, root, { shareValues: true }), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,

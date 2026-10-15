@@ -39,6 +39,8 @@ export interface ToDesignIROptions {
   textLines?: Map<string, TextLine[]>;
   /** Where numbered lists start, by node id, from `toRestDocument`'s `listStarts`. */
   listStarts?: Map<string, number[]>;
+  /** Line heights of runs of "Auto" text in another font or size, by node and style override id, from `toRestDocument`'s `runLineHeights`. */
+  runLineHeights?: Map<string, Record<string, number>>;
 }
 
 const VECTOR_TYPES = new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "REGULAR_POLYGON"]);
@@ -291,6 +293,9 @@ function irText(ctx: Ctx, n: any): IRText {
         delete s.textAlign;
         delete s.verticalAlign;
         for (const k of Object.keys(s)) if (JSON.stringify(s[k]) === JSON.stringify((style as any)[k])) delete s[k];
+        // In "Auto" text, a run in another font or size sets its lines by its own font.
+        const lh = ctx.options.runLineHeights?.get(n.id)?.[String(id)];
+        if (style.lineHeightAuto && lh !== undefined && s.lineHeight === undefined && (s.fontFamily !== undefined || s.fontSize !== undefined) && round(lh, 3) !== style.lineHeight) s.lineHeight = round(lh, 3);
         if (Object.keys(s).length) {
           run.style = s as Partial<IRTextStyle>;
           noteFont(ctx, { ...style, ...s });
@@ -768,9 +773,10 @@ function convert(ctx: Ctx, n: any, parent: Parent | undefined, page: string): IR
     if (key) {
       out.asset = key;
       if (out.type === "vector" || out.type === "frame" || out.type === "group") out.type = "svg";
-      // The artwork draws the node's own fills and strokes too.
+      // The artwork draws the node's own fills and strokes too; the stroke
+      // stays where the parent's layout counts it.
       delete out.fills;
-      delete out.stroke;
+      if (!parent?.rest.strokesIncludedInLayout) delete out.stroke;
       if (out.type !== "instance" && out.type !== "component") delete out.layout;
       if (n.type === "COMPONENT") registerComponent(ctx, n, out, page);
       return out;
@@ -867,13 +873,15 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
 }
 
 /** The design IR of a parsed .fig file: `toDesignIR` over its REST view, with geometry, variables and images. */
-export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines" | "listStarts"> = {}): DesignIR {
+export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines" | "listStarts" | "runLineHeights"> = {}): DesignIR {
   const textLines = new Map<string, TextLine[]>();
   const listStarts = new Map<string, number[]>();
-  return toDesignIR(toRestDocument(doc, { geometry: true, textLines, listStarts }), {
+  const runLineHeights = new Map<string, Record<string, number>>();
+  return toDesignIR(toRestDocument(doc, { geometry: true, textLines, listStarts, runLineHeights }), {
     ...options,
     textLines,
     listStarts,
+    runLineHeights,
     variables: toRestVariables(doc),
     images: doc.images,
   });

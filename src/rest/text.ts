@@ -163,7 +163,7 @@ function typeStyle(rawSrc: any, base: any, lookup: StyleLookup | undefined, reso
     const link = hyperlink(merged.hyperlink);
     if (link) out.hyperlink = link;
   }
-  if (has("lineHeight")) Object.assign(out, lineHeight(merged));
+  if (has("lineHeight")) Object.assign(out, lineHeight(merged, full ? merged : base));
   if (has("leadingTrim") && merged.leadingTrim && merged.leadingTrim !== "NONE") out.leadingTrim = merged.leadingTrim;
   if (!full && "fillPaints" in src) out.fills = paints(src.fillPaints, resolve);
 
@@ -177,10 +177,36 @@ function typeStyle(rawSrc: any, base: any, lookup: StyleLookup | undefined, reso
 }
 
 /**
+ * A font's own line height, in font sizes, from the lines Figma laid out
+ * `node` in: an "Auto" line is as tall as the font's line height at the
+ * largest size on it. Read from a line set in that font alone; for files
+ * whose font metrics are missing or name the font differently.
+ */
+function laidOutLineHeight(node: any, fontName: any): number | undefined {
+  const lines: any[] = node.derivedTextData?.baselines ?? node.textData?.baselines ?? [];
+  const ids: number[] = node.textData?.characterStyleIDs ?? [];
+  const table = new Map<number, any>();
+  for (const e of node.textData?.styleOverrideTable ?? []) if (e?.styleID) table.set(e.styleID, e);
+  for (const l of lines) {
+    let size = 0;
+    for (let i = l.firstCharacter ?? 0; i < (l.endCharacter ?? 0) && size >= 0; i++) {
+      const o = table.get(ids[i] ?? 0);
+      const f = o?.fontName ?? node.fontName;
+      const lh = o?.lineHeight ?? node.lineHeight ?? { value: 100, units: "PERCENT" };
+      if (f?.family !== fontName?.family || f?.style !== fontName?.style || lh.units !== "PERCENT") size = -1;
+      else size = Math.max(size, ((o?.fontSize ?? node.fontSize ?? 12) * lh.value) / 100);
+    }
+    if (size > 0 && l.lineHeight > 0) return l.lineHeight / size;
+  }
+  return undefined;
+}
+
+/**
  * kiwi line heights: PIXELS; PERCENT, of the font's own line height (100% is
  * "Auto"); RAW, a multiple of the font size. A node without one is "Auto".
+ * `node` is the text whose lines were laid out, for its characters' styles.
  */
-function lineHeight(style: any): Partial<Rest.TypeStyle> {
+function lineHeight(style: any, node: any = style): Partial<Rest.TypeStyle> {
   const fontSize = style.fontSize ?? 12;
   const lh = style.lineHeight ?? { value: 100, units: "PERCENT" };
   const intrinsic = fontMeta(style, style.fontName)?.fontLineHeight;
@@ -203,10 +229,29 @@ function lineHeight(style: any): Partial<Rest.TypeStyle> {
     };
   }
   return {
-    lineHeightPx: (lh.value / 100) * fontSize * (intrinsic ?? 1.2),
+    lineHeightPx: (lh.value / 100) * fontSize * (intrinsic ?? laidOutLineHeight(node, style.fontName) ?? 1.2),
     lineHeightPercent: lh.value,
     lineHeightUnit: "INTRINSIC_%",
   };
+}
+
+/**
+ * The line height of each run of `node` that sets another font or size while
+ * the text's line height is relative to the font ("Auto"), by style override
+ * id: Figma sizes such a run's lines by its own font. REST reports none.
+ */
+export function runLineHeights(node: any, lookup?: StyleLookup): Record<string, number> | undefined {
+  const base = withTextStyle(node, lookup);
+  if ((base.lineHeight?.units ?? "PERCENT") !== "PERCENT") return undefined;
+  const out: Record<string, number> = {};
+  for (const entry of node.textData?.styleOverrideTable ?? []) {
+    if (entry?.styleID === undefined) continue;
+    const src = withTextStyle(entry, lookup);
+    if (src.lineHeight !== undefined || (src.fontName === undefined && src.fontSize === undefined)) continue;
+    const px = lineHeight({ ...base, ...src, styleFontMetaData: src.styleFontMetaData ?? base.styleFontMetaData }, base).lineHeightPx;
+    if (px !== undefined) out[String(entry.styleID)] = px;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** The TEXT-specific REST fields of a node. */

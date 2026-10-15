@@ -89,6 +89,50 @@ describe("toRestDocument", () => {
     expect(rest.get("1:4").style).not.toHaveProperty("lineHeightPercentFontSize");
   });
 
+  it("reads an Auto line height from the lines Figma laid out when the font has no metrics", () => {
+    const text = (id: number, extra: any) => ({
+      id, parent: 100, type: "TEXT", fontSize: 60, fontName: { family: "Blex Medium", style: "Regular", postscript: "" }, ...extra,
+    });
+    const rest = index(toRestDocument(docOf([
+      // Metrics under another name for the font, and none at all.
+      text(1, { textData: { characters: "09:00" }, derivedTextData: { fontMetaData: [{ key: { family: "Blex", style: "Medium" }, fontLineHeight: 1.3 }], baselines: [{ firstCharacter: 0, endCharacter: 5, lineHeight: 78 }] } }),
+      text(2, { textData: { characters: "ab", baselines: [{ firstCharacter: 0, endCharacter: 2, lineHeight: 78 }] } }),
+      // A line in another font says nothing about this one.
+      text(3, { textData: { characters: "ab", characterStyleIDs: [1, 1], styleOverrideTable: [{ styleID: 1, fontName: { family: "Inter", style: "Regular" } }], baselines: [{ firstCharacter: 0, endCharacter: 2, lineHeight: 50 }] } }),
+    ])).document);
+    expect(rest.get("1:1").style.lineHeightPx).toBe(78);
+    expect(rest.get("1:2").style.lineHeightPx).toBe(78);
+    expect(rest.get("1:3").style.lineHeightPx).toBe(72);
+  });
+
+  it("gives the line height of runs of Auto text in another font or size, apart from REST", () => {
+    const meta = [
+      { key: { family: "Inter", style: "Regular" }, fontLineHeight: 1.21 },
+      { key: { family: "Poppins", style: "Regular" }, fontLineHeight: 1.5 },
+    ];
+    const text = (id: number, extra: any = {}) => ({
+      id, parent: 100, type: "TEXT", fontSize: 20, fontName: { family: "Inter", style: "Regular", postscript: "" },
+      derivedTextData: { fontMetaData: meta },
+      textData: {
+        characters: "abcde", characterStyleIDs: [0, 1, 2, 3, 4],
+        styleOverrideTable: [
+          { styleID: 1, fontSize: 30 },
+          { styleID: 2, fontName: { family: "Poppins", style: "Regular", postscript: "" } },
+          { styleID: 3, fontSize: 30, lineHeight: { value: 40, units: "PIXELS" } },
+          { styleID: 4, fillPaints: [] },
+        ],
+      },
+      ...extra,
+    });
+    const runLineHeights = new Map<string, Record<string, number>>();
+    const rest = index(toRestDocument(docOf([text(1), text(2, { lineHeight: { value: 24, units: "PIXELS" } })]), { runLineHeights }).document);
+    expect(runLineHeights.get("1:1")).toEqual({ 1: 36.3, 2: 30 });
+    // A fixed line height holds for every run.
+    expect(runLineHeights.has("1:2")).toBe(false);
+    // REST reports no line height for such a run.
+    expect(rest.get("1:1").styleOverrideTable["1"]).not.toHaveProperty("lineHeightPx");
+  });
+
   it("shows the current value of a fill style and a text style, not the copy cached on the node", () => {
     const doc = docOf([
       { id: 50, parent: 100, type: "ROUNDED_RECTANGLE", styleType: "FILL", name: "Brand", fillPaints: [{ type: "SOLID", color: { r: 1, g: 0, b: 0, a: 1 } }] } as any,

@@ -251,6 +251,19 @@ describe("toDesignIR", () => {
     expect(n.get("1:2")!.text!.style).not.toHaveProperty("leadingTrim");
   });
 
+  it("gives runs of Auto text in another font or size their own line height", () => {
+    const style = (lineHeightUnit: string) => ({ fontFamily: "Inter", fontStyle: "Regular", fontWeight: 400, fontSize: 20, lineHeightPx: 24.2, lineHeightPercent: 100, lineHeightUnit });
+    const text = (id: string, unit: string) => node(id, "TEXT", {
+      characters: "abc", style: style(unit), characterStyleOverrides: [0, 1, 2],
+      styleOverrideTable: { 1: { fontSize: 30 }, 2: { fontFamily: "Poppins" } },
+    });
+    const runLineHeights = new Map<string, Record<string, number>>([["1:1", { 1: 36.3, 2: 30 }], ["1:2", { 1: 36.3 }]]);
+    const n = index(toDesignIR(file([text("1:1", "INTRINSIC_%"), text("1:2", "PIXELS")]), { runLineHeights }));
+    expect(n.get("1:1")!.text!.runs!.map((r) => r.style)).toEqual([undefined, { fontSize: 30, lineHeight: 36.3 }, { fontFamily: "Poppins", lineHeight: 30 }]);
+    // A fixed line height holds for every run.
+    expect(n.get("1:2")!.text!.runs![1].style).toEqual({ fontSize: 30 });
+  });
+
   it("gives Figma's lines of a text from the file", () => {
     const doc = parseFig(new Uint8Array(readFileSync(join(__dirname, "..", "..", "test-fixtures", "instances", "medium-complex.fig"))));
     const textLines = new Map();
@@ -397,6 +410,21 @@ describe("toDesignIR", () => {
     );
     // Auto layout is kept as layout, not drawn.
     expect(n.get("1:1")!.type).toBe("frame");
+  });
+
+  it("keeps the stroke of artwork where its parent's layout counts strokes", () => {
+    const icon = (id: string) => node(id, "VECTOR", {
+      name: "Icon", size: { x: 16, y: 16 }, strokes: [solid(0, 0, 0)], strokeWeight: 2, strokeAlign: "CENTER",
+      fillGeometry: [], strokeGeometry: [{ path: "M0 0L16 0L16 16Z", windingRule: "NONZERO" }],
+    });
+    const n = index(toDesignIR(file([
+      node("1:1", "FRAME", { layoutMode: "HORIZONTAL", strokesIncludedInLayout: true, fillGeometry: [], strokeGeometry: [], children: [icon("1:2")] }),
+      node("2:1", "FRAME", { layoutMode: "HORIZONTAL", fillGeometry: [], strokeGeometry: [], children: [icon("2:2")] }),
+    ])));
+    // The artwork draws it; the stroke still takes space in the layout.
+    expect(n.get("1:2")).toMatchObject({ type: "svg", stroke: { weight: 2, align: "center" } });
+    expect(n.get("2:2")!.type).toBe("svg");
+    expect(n.get("2:2")).not.toHaveProperty("stroke");
   });
 
   it("grows SVG artwork to take in paint outside the node's box", () => {
