@@ -312,8 +312,15 @@ export interface IRText {
    * how wide each line was and where it sat; a browser with another build of
    * a font measures a few percent differently. Absent when the file holds no
    * layout for the text.
+   *
+   * When the lines differ in height (a run in a larger size or another
+   * font, or a paragraph of another line height), each also has its
+   * `lineHeight`: Figma puts a line's baseline its own line height below the
+   * one before, so a larger line above adds no space under itself. CSS
+   * cannot lay lines out so, and a browser can set the text taller than the
+   * node's `height` (most when the first line is much the tallest).
    */
-  measuredLines?: Array<{ start: number; width: number; baseline?: number }>;
+  measuredLines?: Array<{ start: number; width: number; baseline?: number; lineHeight?: number }>;
 }
 
 export interface IRTextStyle {

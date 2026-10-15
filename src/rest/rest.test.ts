@@ -105,6 +105,22 @@ describe("toRestDocument", () => {
     expect(rest.get("1:3").style.lineHeightPx).toBe(72);
   });
 
+  it("gives each line's height when Figma laid the lines out in different heights", () => {
+    const text = (id: number, baselines: any[]) => ({
+      id, parent: 100, type: "TEXT", fontSize: 96, fontName: { family: "Inter", style: "Regular", postscript: "" },
+      textData: { characters: "Big\nsmall", baselines },
+    });
+    const line = (firstCharacter: number, endCharacter: number, lineHeight: number, y: number) => ({ firstCharacter, endCharacter, lineHeight, width: 10, position: { x: 0, y } });
+    const textLines = new Map();
+    toRestDocument(docOf([
+      text(1, [line(0, 4, 308.48, 236.816), line(4, 9, 116, 352.816)]),
+      text(2, [line(0, 4, 116, 90), line(4, 9, 116, 206)]),
+    ]), { textLines });
+    // The second baseline is the second line's height below the first.
+    expect(textLines.get("1:1").map((l: any) => l.lineHeight)).toEqual([308.48, 116]);
+    expect(textLines.get("1:2")[0]).not.toHaveProperty("lineHeight");
+  });
+
   it("gives the line height of runs of Auto text in another font or size, apart from REST", () => {
     const meta = [
       { key: { family: "Inter", style: "Regular" }, fontLineHeight: 1.21 },

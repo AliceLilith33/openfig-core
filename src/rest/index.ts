@@ -53,6 +53,8 @@ export interface TextLine {
   start: number;
   width: number;
   baseline: number;
+  /** Only when the lines differ in height: this line's. */
+  lineHeight?: number;
 }
 
 export type RestFile = Pick<
@@ -760,7 +762,12 @@ function textLines(n: any): TextLine[] | undefined {
   if (lines[lines.length - 1].endCharacter !== count) return undefined;
   // Figma rounds a width up to whole pixels: thousandths keep a hair over one.
   const r = (v: number | undefined) => Math.round((v ?? 0) * 1000) / 1000;
-  return lines.map((b) => ({ start: b.firstCharacter ?? 0, width: r(b.width), baseline: r(b.position?.y) }));
+  const out: TextLine[] = lines.map((b) => ({ start: b.firstCharacter ?? 0, width: r(b.width), baseline: r(b.position?.y) }));
+  // Figma puts each baseline one line height, the line's own, below the one
+  // before; a browser's lines of different heights stack otherwise.
+  const heights = lines.map((b) => Math.round((b.lineHeight ?? 0) * 100) / 100);
+  if (heights.every((h) => h > 0) && new Set(heights).size > 1) out.forEach((l, i) => (l.lineHeight = heights[i]));
+  return out;
 }
 
 function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
