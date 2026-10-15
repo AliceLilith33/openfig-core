@@ -294,11 +294,14 @@ export interface IRText {
   /** Spans styled differently from `style`, in order, covering the whole content. Absent when uniform. */
   runs?: IRTextRun[];
   /**
-   * List formatting per line (paragraph), when any line is a list item.
+   * List formatting per line (paragraph), when any line is a list item or
+   * sets its own paragraph spacing.
    * `start`: the number an ordered item shows when it does not continue the
    * count from the items before it at its level (absent: counting on, from 1).
+   * `paragraphSpacing`: the space after this paragraph, where it differs from
+   * the text's (absent: the text's).
    */
-  lines?: Array<{ list?: "ordered" | "unordered"; indent?: number; start?: number }>;
+  lines?: Array<{ list?: "ordered" | "unordered"; indent?: number; start?: number; paragraphSpacing?: number }>;
   /** How the box follows the text: `width` grows both ways, `height` wraps at the width. */
   autoResize?: "width" | "height" | "truncate";
   maxLines?: number;
@@ -315,12 +318,16 @@ export interface IRText {
    *
    * When the lines differ in height (a run in a larger size or another
    * font, or a paragraph of another line height), each also has its
-   * `lineHeight`: Figma puts a line's baseline its own line height below the
-   * one before, so a larger line above adds no space under itself. CSS
-   * cannot lay lines out so, and a browser can set the text taller than the
-   * node's `height` (most when the first line is much the tallest).
+   * `lineHeight` as Figma saved it (the larger of the line's line height and
+   * its font's own height) and the `top` of its box: Figma puts a line's
+   * baseline its own line height below the one before, so a larger line
+   * above adds no space under itself, and starts the line's box as far above
+   * the baseline as in a line of that font alone. The text's box ends at the
+   * last line's, rounded up to a whole pixel. CSS stacks the lines' boxes
+   * instead, and a browser can set the text taller than the node's `height`
+   * (most when the first line is much the tallest).
    */
-  measuredLines?: Array<{ start: number; width: number; baseline?: number; lineHeight?: number }>;
+  measuredLines?: Array<{ start: number; width: number; baseline?: number; lineHeight?: number; top?: number }>;
 }
 
 export interface IRTextStyle {

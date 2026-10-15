@@ -150,6 +150,14 @@ describe("toDesignIR", () => {
     expect(index(ir).get("1:1")!.text!.lines).toEqual([{ list: "ordered", indent: 1, start: 4 }, { list: "ordered", indent: 1 }]);
   });
 
+  it("gives a paragraph its own spacing where it differs from the text's", () => {
+    const style = { fontFamily: "Inter", fontStyle: "Regular", fontWeight: 400, fontSize: 16, lineHeightPx: 24, lineHeightUnit: "PIXELS", paragraphSpacing: 16 };
+    const ir = toDesignIR(file([
+      node("1:1", "TEXT", { characters: "a\nb\nc", lineTypes: ["NONE", "NONE", "NONE"], lineIndentations: [0, 0, 0], style }),
+    ]), { paragraphSpacings: new Map([["1:1", { 0: 24, 1: 16 }]]) });
+    expect(index(ir).get("1:1")!.text!.lines).toEqual([{ paragraphSpacing: 24 }, {}, {}]);
+  });
+
   it("counts an emoji outside the BMP as one character when splitting runs", () => {
     const ir = toDesignIR(file([
       node("1:1", "TEXT", {

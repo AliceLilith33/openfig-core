@@ -17,7 +17,7 @@ import { findVariableSet, resolveVariableData } from "../variables.js";
 import { geometryBlobToSVGPath, getBlobBytes } from "../vector.js";
 import { color, effects, guidString, paints, variableAlias, type ColorResolver } from "./paint.js";
 import { interactions } from "./interactions.js";
-import { runLineHeights, textBinding, textFields, textStyleRef } from "./text.js";
+import { paragraphSpacings, runLineHeights, textBinding, textFields, textStyleRef } from "./text.js";
 import { collectionIdOfRef, restCollectionId } from "./variables.js";
 
 export interface ToRestOptions {
@@ -40,6 +40,12 @@ export interface ToRestOptions {
    * sizes such a run's lines by its own font. REST has no field for it.
    */
   runLineHeights?: Map<string, Record<string, number>>;
+  /**
+   * Filled, when given, with the spacing after each paragraph that sets its
+   * own, by node id and paragraph index: Figma lays such a paragraph out with
+   * it instead of the text's. REST has no field for it.
+   */
+  paragraphSpacings?: Map<string, Record<string, number>>;
 }
 
 /**
@@ -55,6 +61,12 @@ export interface TextLine {
   baseline: number;
   /** Only when the lines differ in height: this line's. */
   lineHeight?: number;
+  /**
+   * Only when the lines differ in height: the top of this line's box, in
+   * pixels from the top of the text's box. The baseline is as far below it
+   * as in a line of the same font and line height alone.
+   */
+  top?: number;
 }
 
 export type RestFile = Pick<
@@ -75,6 +87,7 @@ interface Ctx {
   textLines?: Map<string, TextLine[]>;
   listStarts?: Map<string, number[]>;
   runLineHeights?: Map<string, Record<string, number>>;
+  paragraphSpacings?: Map<string, Record<string, number>>;
   /** SVG path of each geometry blob already written: instances share their components' blobs. */
   paths: Map<Uint8Array, string>;
 }
@@ -766,7 +779,10 @@ function textLines(n: any): TextLine[] | undefined {
   // Figma puts each baseline one line height, the line's own, below the one
   // before; a browser's lines of different heights stack otherwise.
   const heights = lines.map((b) => Math.round((b.lineHeight ?? 0) * 100) / 100);
-  if (heights.every((h) => h > 0) && new Set(heights).size > 1) out.forEach((l, i) => (l.lineHeight = heights[i]));
+  if (heights.every((h) => h > 0) && new Set(heights).size > 1) out.forEach((l, i) => {
+    l.lineHeight = heights[i];
+    l.top = r(lines[i].lineY);
+  });
   return out;
 }
 
@@ -919,6 +935,8 @@ function convert(ctx: Ctx, r: ResolvedNode, scope: Scope): any {
     if (ctx.listStarts && starts?.some((s) => s)) ctx.listStarts.set(id, starts);
     const heights = ctx.runLineHeights && runLineHeights(n, scaled ? undefined : (ref) => styleNode(ctx, ref));
     if (heights) ctx.runLineHeights!.set(id, heights);
+    const spacings = ctx.paragraphSpacings && paragraphSpacings(n);
+    if (spacings) ctx.paragraphSpacings!.set(id, spacings);
   }
   if (type === "BOOLEAN_OPERATION") out.booleanOperation = n.booleanOperation ?? "UNION";
   if (type === "ELLIPSE") {
@@ -1023,7 +1041,7 @@ export function toRestDocument(doc: FigDocument, options: ToRestOptions = {}): R
     const key = (n as any).key ?? (n as any).componentKey;
     if (key && n.phase !== "REMOVED") byKey.set(key, n);
   }
-  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, listStarts: options.listStarts, runLineHeights: options.runLineHeights, paths: new Map() };
+  const ctx: Ctx = { doc, geometry: options.geometry === true, byKey, usedComponents: new Set(), usedStyles: new Set(), painted: new WeakMap(), textLines: options.textLines, listStarts: options.listStarts, runLineHeights: options.runLineHeights, paragraphSpacings: options.paragraphSpacings, paths: new Map() };
   const document = convert(ctx, resolveTree(doc, root, { shareValues: true }), {
     abs: IDENTITY_TRANSFORM,
     hidden: false,

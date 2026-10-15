@@ -41,6 +41,8 @@ export interface ToDesignIROptions {
   listStarts?: Map<string, number[]>;
   /** Line heights of runs of "Auto" text in another font or size, by node and style override id, from `toRestDocument`'s `runLineHeights`. */
   runLineHeights?: Map<string, Record<string, number>>;
+  /** The spacing after paragraphs that set their own, by node id and paragraph index, from `toRestDocument`'s `paragraphSpacings`. */
+  paragraphSpacings?: Map<string, Record<string, number>>;
 }
 
 const VECTOR_TYPES = new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "REGULAR_POLYGON"]);
@@ -311,15 +313,19 @@ function irText(ctx: Ctx, n: any): IRText {
     if (runs.some((r) => r.style || r.fills || r.link)) out.runs = runs;
   }
   const types: string[] = n.lineTypes ?? [];
-  if (types.some((t) => t !== "NONE")) {
+  // A paragraph's own spacing counts where it differs from the text's.
+  const spacings = Object.entries(ctx.options.paragraphSpacings?.get(n.id) ?? {}).filter(([, v]) => v !== (style.paragraphSpacing ?? 0));
+  if (types.some((t) => t !== "NONE") || spacings.length) {
     const indents: number[] = n.lineIndentations ?? [];
     const starts = ctx.options.listStarts?.get(n.id) ?? [];
+    const spacing = Object.fromEntries(spacings);
     out.lines = types.map((t, i) => {
       const line: NonNullable<IRText["lines"]>[number] = {};
       if (t === "ORDERED") line.list = "ordered";
       if (t === "ORDERED" && starts[i]) line.start = starts[i] + 1;
       if (t === "UNORDERED") line.list = "unordered";
       if (indents[i]) line.indent = indents[i];
+      if (spacing[i] !== undefined) line.paragraphSpacing = spacing[i];
       return line;
     });
   }
@@ -873,15 +879,17 @@ export function toDesignIR(file: RestFile, options: ToDesignIROptions = {}): Des
 }
 
 /** The design IR of a parsed .fig file: `toDesignIR` over its REST view, with geometry, variables and images. */
-export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines" | "listStarts" | "runLineHeights"> = {}): DesignIR {
+export function designFromFig(doc: FigDocument, options: Omit<ToDesignIROptions, "variables" | "images" | "textLines" | "listStarts" | "runLineHeights" | "paragraphSpacings"> = {}): DesignIR {
   const textLines = new Map<string, TextLine[]>();
   const listStarts = new Map<string, number[]>();
   const runLineHeights = new Map<string, Record<string, number>>();
-  return toDesignIR(toRestDocument(doc, { geometry: true, textLines, listStarts, runLineHeights }), {
+  const paragraphSpacings = new Map<string, Record<string, number>>();
+  return toDesignIR(toRestDocument(doc, { geometry: true, textLines, listStarts, runLineHeights, paragraphSpacings }), {
     ...options,
     textLines,
     listStarts,
     runLineHeights,
+    paragraphSpacings,
     variables: toRestVariables(doc),
     images: doc.images,
   });

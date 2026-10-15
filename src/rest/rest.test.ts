@@ -110,15 +110,36 @@ describe("toRestDocument", () => {
       id, parent: 100, type: "TEXT", fontSize: 96, fontName: { family: "Inter", style: "Regular", postscript: "" },
       textData: { characters: "Big\nsmall", baselines },
     });
-    const line = (firstCharacter: number, endCharacter: number, lineHeight: number, y: number) => ({ firstCharacter, endCharacter, lineHeight, width: 10, position: { x: 0, y } });
+    const line = (firstCharacter: number, endCharacter: number, lineHeight: number, y: number, lineY = 0) => ({ firstCharacter, endCharacter, lineHeight, width: 10, position: { x: 0, y }, lineY });
     const textLines = new Map();
     toRestDocument(docOf([
-      text(1, [line(0, 4, 308.48, 236.816), line(4, 9, 116, 352.816)]),
-      text(2, [line(0, 4, 116, 90), line(4, 9, 116, 206)]),
+      text(1, [line(0, 4, 308.48, 236.816), line(4, 9, 116, 352.816, 264.7600002)]),
+      text(2, [line(0, 4, 116, 90), line(4, 9, 116, 206, 116)]),
     ]), { textLines });
     // The second baseline is the second line's height below the first.
     expect(textLines.get("1:1").map((l: any) => l.lineHeight)).toEqual([308.48, 116]);
+    // Its box starts as far above it as in a line of that font alone.
+    expect(textLines.get("1:1").map((l: any) => l.top)).toEqual([0, 264.76]);
     expect(textLines.get("1:2")[0]).not.toHaveProperty("lineHeight");
+    expect(textLines.get("1:2")[1]).not.toHaveProperty("top");
+  });
+
+  it("gives the spacing after paragraphs that set their own, apart from REST", () => {
+    const paragraphSpacings = new Map<string, Record<string, number>>();
+    const text = (id: number, textData: any, extra: any = {}) => ({
+      id, parent: 100, type: "TEXT", fontSize: 16, fontName: { family: "Inter", style: "Regular", postscript: "" }, textData, ...extra,
+    });
+    toRestDocument(docOf([
+      text(1, {
+        characters: "a\nb\nc\nd",
+        styleOverrideTable: [{ styleID: 1, paragraphSpacing: 24 }, { styleID: 2, paragraphSpacing: 0 }, { styleID: 3, fontSize: 20 }],
+        lines: [{ styleId: 1 }, { styleId: 2 }, { styleId: 3 }, { styleId: 0 }],
+      }, { paragraphSpacing: 16 }),
+      text(2, { characters: "a\nb", lines: [{ styleId: 0 }, { styleId: 0 }] }),
+    ]), { paragraphSpacings });
+    // A paragraph's style override without a spacing leaves the text's.
+    expect(paragraphSpacings.get("1:1")).toEqual({ 0: 24, 1: 0 });
+    expect(paragraphSpacings.has("1:2")).toBe(false);
   });
 
   it("gives the line height of runs of Auto text in another font or size, apart from REST", () => {

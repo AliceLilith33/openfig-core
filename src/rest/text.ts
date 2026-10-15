@@ -254,6 +254,22 @@ export function runLineHeights(node: any, lookup?: StyleLookup): Record<string, 
   return Object.keys(out).length ? out : undefined;
 }
 
+/**
+ * The spacing after each paragraph that sets its own, by paragraph index:
+ * a paragraph's `styleId` in `textData.lines` names a style override whose
+ * `paragraphSpacing` Figma lays the paragraph out with. REST reports none.
+ */
+export function paragraphSpacings(node: any): Record<string, number> | undefined {
+  const table = new Map<number, any>();
+  for (const e of node.textData?.styleOverrideTable ?? []) if (e?.styleID) table.set(e.styleID, e);
+  const out: Record<string, number> = {};
+  (node.textData?.lines ?? []).forEach((l: any, i: number) => {
+    const v = l?.styleId ? table.get(l.styleId)?.paragraphSpacing : undefined;
+    if (v !== undefined) out[String(i)] = v;
+  });
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** The TEXT-specific REST fields of a node. */
 export function textFields(node: any, lookup?: StyleLookup, resolve?: ColorResolver): Partial<Rest.TextNode> {
   const data = node.textData ?? {};
