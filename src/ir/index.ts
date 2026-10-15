@@ -39,7 +39,7 @@ export interface ToDesignIROptions {
   textLines?: Map<string, TextLine[]>;
   /** Where numbered lists start, by node id, from `toRestDocument`'s `listStarts`. */
   listStarts?: Map<string, number[]>;
-  /** Line heights of runs of "Auto" text in another font or size, by node and style override id, from `toRestDocument`'s `runLineHeights`. */
+  /** Line heights of runs of "Auto" text, or text with a line height in font sizes, in another font or size, by node and style override id, from `toRestDocument`'s `runLineHeights`. */
   runLineHeights?: Map<string, Record<string, number>>;
   /** The spacing after paragraphs that set their own, by node id and paragraph index, from `toRestDocument`'s `paragraphSpacings`. */
   paragraphSpacings?: Map<string, Record<string, number>>;
@@ -295,9 +295,10 @@ function irText(ctx: Ctx, n: any): IRText {
         delete s.textAlign;
         delete s.verticalAlign;
         for (const k of Object.keys(s)) if (JSON.stringify(s[k]) === JSON.stringify((style as any)[k])) delete s[k];
-        // In "Auto" text, a run in another font or size sets its lines by its own font.
+        // In "Auto" text, a run in another font or size sets its lines by its own
+        // font; with a line height in font sizes, by its own size.
         const lh = ctx.options.runLineHeights?.get(n.id)?.[String(id)];
-        if (style.lineHeightAuto && lh !== undefined && s.lineHeight === undefined && (s.fontFamily !== undefined || s.fontSize !== undefined) && round(lh, 3) !== style.lineHeight) s.lineHeight = round(lh, 3);
+        if ((style.lineHeightAuto || base.lineHeightUnit === "FONT_SIZE_%") && lh !== undefined && s.lineHeight === undefined && (s.fontFamily !== undefined || s.fontSize !== undefined) && round(lh, 3) !== style.lineHeight) s.lineHeight = round(lh, 3);
         if (Object.keys(s).length) {
           run.style = s as Partial<IRTextStyle>;
           noteFont(ctx, { ...style, ...s });

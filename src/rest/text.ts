@@ -237,12 +237,13 @@ function lineHeight(style: any, node: any = style): Partial<Rest.TypeStyle> {
 
 /**
  * The line height of each run of `node` that sets another font or size while
- * the text's line height is relative to the font ("Auto"), by style override
- * id: Figma sizes such a run's lines by its own font. REST reports none.
+ * the text's line height is relative to the font ("Auto") or to the font
+ * size, by style override id: Figma sizes such a run's lines by its own font
+ * and size. REST reports none.
  */
 export function runLineHeights(node: any, lookup?: StyleLookup): Record<string, number> | undefined {
   const base = withTextStyle(node, lookup);
-  if ((base.lineHeight?.units ?? "PERCENT") !== "PERCENT") return undefined;
+  if (base.lineHeight?.units === "PIXELS") return undefined;
   const out: Record<string, number> = {};
   for (const entry of node.textData?.styleOverrideTable ?? []) {
     if (entry?.styleID === undefined) continue;

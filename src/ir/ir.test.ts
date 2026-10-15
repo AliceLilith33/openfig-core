@@ -265,11 +265,13 @@ describe("toDesignIR", () => {
       characters: "abc", style: style(unit), characterStyleOverrides: [0, 1, 2],
       styleOverrideTable: { 1: { fontSize: 30 }, 2: { fontFamily: "Poppins" } },
     });
-    const runLineHeights = new Map<string, Record<string, number>>([["1:1", { 1: 36.3, 2: 30 }], ["1:2", { 1: 36.3 }]]);
-    const n = index(toDesignIR(file([text("1:1", "INTRINSIC_%"), text("1:2", "PIXELS")]), { runLineHeights }));
+    const runLineHeights = new Map<string, Record<string, number>>([["1:1", { 1: 36.3, 2: 30 }], ["1:2", { 1: 36.3 }], ["1:3", { 1: 36.3, 2: 24.2 }]]);
+    const n = index(toDesignIR(file([text("1:1", "INTRINSIC_%"), text("1:2", "PIXELS"), text("1:3", "FONT_SIZE_%")]), { runLineHeights }));
     expect(n.get("1:1")!.text!.runs!.map((r) => r.style)).toEqual([undefined, { fontSize: 30, lineHeight: 36.3 }, { fontFamily: "Poppins", lineHeight: 30 }]);
     // A fixed line height holds for every run.
     expect(n.get("1:2")!.text!.runs![1].style).toEqual({ fontSize: 30 });
+    // A line height in font sizes follows the run's size, not its font.
+    expect(n.get("1:3")!.text!.runs!.map((r) => r.style)).toEqual([undefined, { fontSize: 30, lineHeight: 36.3 }, { fontFamily: "Poppins" }]);
   });
 
   it("gives Figma's lines of a text from the file", () => {

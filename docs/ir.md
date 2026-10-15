@@ -209,7 +209,10 @@ the kept component definitions. `openfig-web ir --screen` writes this.
   such text a run in another font or size has its own `lineHeight`, from its
   own font: Figma makes each line as tall as the tallest of its runs' line
   heights, rounded to a whole pixel, and the text's own size sets no
-  minimum. With a fixed line height, every line has it.
+  minimum. A line height in font sizes (Figma's percent of the size, 115%
+  say) is a multiple of each run's own size, so a run in another size has
+  its own `lineHeight` too (178 lines in 2 files of the corpus are set so).
+  With a fixed line height, every line has it.
 - `style.textTransform: "capitalize"` is Figma's title case; `small-caps` and
   `all-small-caps` map to `font-variant-caps`. `leadingTrim: "cap"` is CSS's
   `text-box: trim-both cap alphabetic`.

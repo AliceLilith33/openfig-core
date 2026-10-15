@@ -188,10 +188,12 @@ describe("toRestDocument", () => {
       ...extra,
     });
     const runLineHeights = new Map<string, Record<string, number>>();
-    const rest = index(toRestDocument(docOf([text(1), text(2, { lineHeight: { value: 24, units: "PIXELS" } })]), { runLineHeights }).document);
+    const rest = index(toRestDocument(docOf([text(1), text(2, { lineHeight: { value: 24, units: "PIXELS" } }), text(3, { lineHeight: { value: 1.5, units: "RAW" } })]), { runLineHeights }).document);
     expect(runLineHeights.get("1:1")).toEqual({ 1: 36.3, 2: 30 });
     // A fixed line height holds for every run.
     expect(runLineHeights.has("1:2")).toBe(false);
+    // A line height in font sizes follows the run's size.
+    expect(runLineHeights.get("1:3")).toEqual({ 1: 45, 2: 30 });
     // REST reports no line height for such a run.
     expect(rest.get("1:1").styleOverrideTable["1"]).not.toHaveProperty("lineHeightPx");
   });
