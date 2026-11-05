@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-alice] - 2026-11-05
+
 ### Fixed
 
 - **`childrenMap` listed siblings in `nodeChanges` order, not layer order.** `nodeChanges` is not sorted by `parentIndex.position`; 25 parents in one reference file came out reordered. `parseFigBinary` now sorts each sibling list by position, byte by byte, as Figma does.
@@ -93,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Isomorphic Parser & Encoder** — Initial open-source release of the isomorphic `.fig` and `.deck` file parser and Kiwi binary encoder, allowing reading and writing of Figma's schema-driven format in both Node.js and browser runtimes.
 - **Kiwi Schema Interoperability** — Integration of schema-driven Kiwi binary serialization, resolving zip archives (`fzstd`/`fflate` decoders), geometry nodes, vector path conversions, and gradient color structures.
 
+[0.5.0-alice]: https://github.com/AliceLilith33/openfig-core/releases/tag/v0.5.0-alice
 [0.4.1]: https://github.com/OpenFig-org/openfig-core/releases/tag/v0.4.1
 [0.4.0]: https://github.com/OpenFig-org/openfig-core/releases/tag/v0.4.0
 [0.3.7]: https://github.com/OpenFig-org/openfig-core/releases/tag/v0.3.7
