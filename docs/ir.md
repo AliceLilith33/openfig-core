@@ -146,7 +146,7 @@ that screen and the flows starting there; the components its instances use
 definitions of these use in turn; the styles and tokens its nodes refer to,
 with the tokens their values alias; and the SVG artwork, images and fonts it
 uses. Image and font `nodes` count the uses in what is kept: the screen and
-the kept component definitions. `openfig-web ir --screen` writes this.
+the kept component definitions. `figpage ir --screen` writes this.
 
 ## Reading the IR
 
@@ -239,7 +239,7 @@ the kept component definitions. `openfig-web ir --screen` writes this.
   `filter: blur(radius / 2)` and `background-blur` is
   `backdrop-filter: blur(radius / 2)`. Shadow `blur` goes into `box-shadow`
   as is, and halved into a `drop-shadow()` filter. (This is the reference
-  page's conversion in openfig-web; it was not measured against Figma.)
+  page's conversion in figpage; it was not measured against Figma.)
 - `arc` angles are radians, clockwise from 3 o'clock. `end` below `start` is
   the same arc swept the other way: it covers the angles between the two.
   `innerRadius` is a fraction of the radius (a ring).
